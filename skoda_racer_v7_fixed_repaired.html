@@ -1,0 +1,1124 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Škoda Racer</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323:wght@400&display=swap');
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:#000;overflow:hidden;width:100vw;height:100vh;display:flex;align-items:center;justify-content:center;font-family:'VT323',monospace;}
+canvas{display:block;position:absolute;top:0;left:0;}
+.screen{position:absolute;top:0;left:0;width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;}
+#menu-screen{background:radial-gradient(ellipse at 50% 40%,#0d1f3c 0%,#040810 70%);}
+#result-screen{background:radial-gradient(ellipse at 50% 40%,#1a0d00 0%,#060200 70%);display:none;}
+.logo{font-family:'Press Start 2P',monospace;font-size:clamp(22px,4.5vw,54px);color:#ffdd00;text-shadow:4px 4px 0 #cc8800,0 0 50px #ffaa00;letter-spacing:4px;line-height:1.3;text-align:center;}
+.logo-sub{font-family:'Press Start 2P',monospace;font-size:clamp(9px,1.6vw,18px);color:#ff6600;margin-top:6px;text-shadow:2px 2px 0 #993300;letter-spacing:8px;text-align:center;margin-bottom:28px;}
+.stitle{font-family:'Press Start 2P',monospace;font-size:clamp(8px,1.1vw,12px);color:#44aaff;letter-spacing:4px;margin-bottom:14px;text-shadow:0 0 10px #004488;}
+.cars-grid{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;max-width:min(880px,96vw);margin-bottom:22px;}
+.car-card{width:clamp(68px,8.5vw,90px);background:#050a14;border:2px solid #1a3060;padding:8px 5px;cursor:pointer;text-align:center;transition:all 0.15s;position:relative;font-family:'VT323',monospace;}
+.car-card:hover:not(.locked){border-color:#ffdd00;transform:translateY(-3px);}
+.car-card.selected{border-color:#ffdd00;background:#0f1a08;box-shadow:0 0 14px rgba(255,221,0,0.3);}
+.car-card.locked{opacity:0.28;cursor:not-allowed;}
+.car-card.locked::after{content:'🔒';position:absolute;top:2px;right:3px;font-size:11px;}
+.cicon{font-size:20px;line-height:1;margin-bottom:3px;}
+.cname{font-size:clamp(10px,1.1vw,13px);color:#ffdd00;font-weight:700;line-height:1.2;}
+.cyear{font-size:10px;color:#445;margin-top:1px;}
+.sbar{height:3px;background:#0d1f3c;border-radius:1px;margin-top:3px;}
+.sfill{height:100%;border-radius:1px;}
+.cunlk{font-size:10px;color:#336;margin-top:2px;}
+#car-preview-wrap{display:flex;flex-direction:column;align-items:center;margin-bottom:18px;}
+.car-preview-label{font-family:'Press Start 2P',monospace;font-size:8px;color:#ffdd00;letter-spacing:3px;margin-bottom:6px;text-shadow:0 0 8px #aa8800;}
+#cprev{border:2px solid #1a3060;background:#060c1a;display:block;}
+.tracks-row{display:flex;gap:12px;justify-content:center;margin-bottom:24px;flex-wrap:wrap;}
+.track-card{width:clamp(125px,14vw,165px);background:#050a14;border:2px solid #1a3060;padding:12px 8px;cursor:pointer;text-align:center;transition:all 0.15s;position:relative;font-family:'VT323',monospace;}
+.track-card:hover:not(.locked){border-color:#44aaff;transform:translateY(-3px);}
+.track-card.selected{border-color:#44aaff;background:#040c18;box-shadow:0 0 14px rgba(68,170,255,0.25);}
+.track-card.locked{opacity:0.28;cursor:not-allowed;}
+.track-card.locked::after{content:'🔒';position:absolute;top:5px;right:5px;}
+.ticon{font-size:26px;margin-bottom:5px;}
+.tname{font-family:'Press Start 2P',monospace;font-size:clamp(6px,0.85vw,9px);color:#44aaff;letter-spacing:1px;margin-bottom:5px;}
+.tdesc{font-size:13px;color:#445;line-height:1.4;}
+.tbest{font-size:12px;color:#ffdd00;margin-top:4px;}
+.btn{font-family:'Press Start 2P',monospace;font-size:clamp(10px,1.4vw,15px);padding:14px 38px;border:3px solid #ffdd00;background:#0a0800;color:#ffdd00;cursor:pointer;letter-spacing:4px;text-transform:uppercase;transition:all 0.15s;text-shadow:2px 2px 0 #cc8800;}
+.btn:hover{background:#ffdd00;color:#000;box-shadow:0 0 30px rgba(255,221,0,0.5);}
+.btn-sec{border-color:#44aaff;color:#44aaff;margin-top:10px;font-size:clamp(8px,0.9vw,10px);padding:9px 22px;}
+.btn-sec:hover{background:#44aaff;color:#000;}
+.wins-badge{position:absolute;top:14px;right:18px;font-family:'Press Start 2P',monospace;font-size:9px;color:#ffdd00;text-align:right;line-height:1.9;}
+.rt{font-family:'Press Start 2P',monospace;font-size:clamp(18px,4vw,42px);color:#ffdd00;text-shadow:4px 4px 0 #cc8800;margin-bottom:14px;}
+.rtm{font-family:'Press Start 2P',monospace;font-size:clamp(22px,5vw,56px);color:#fff;margin:18px 0;text-shadow:3px 3px 0 #555;}
+.rlbl{font-size:15px;color:#445;letter-spacing:4px;}
+.rbest{font-size:17px;color:#ffdd00;margin-top:6px;}
+.runlk{background:#0a0800;border:2px solid #ffdd00;padding:10px 22px;font-family:'Press Start 2P',monospace;font-size:clamp(7px,0.9vw,9px);color:#ffdd00;margin:16px 0;display:none;line-height:2;text-align:center;}
+/* HUD */
+#hud{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;display:none;}
+#hspeed{position:absolute;bottom:4px;right:10px;font-family:'Press Start 2P',monospace;color:#ffdd00;text-align:right;text-shadow:2px 2px 0 #884400;}
+#hspeed .sv{font-size:clamp(26px,5vw,50px);}
+#hspeed .su{font-size:clamp(7px,1.1vw,11px);color:#884;letter-spacing:2px;}
+#hgear{position:absolute;bottom:4px;left:10px;font-family:'Press Start 2P',monospace;color:#ff4444;text-shadow:2px 2px 0 #880000;}
+#hgear .gv{font-size:clamp(34px,6vw,62px);}
+#hgear .gl{font-size:clamp(6px,0.9vw,9px);color:#553;letter-spacing:2px;}
+#htimer{position:absolute;top:8px;left:50%;transform:translateX(-50%);text-align:center;font-family:'Press Start 2P',monospace;}
+#htimer .tv{font-size:clamp(15px,2.8vw,30px);color:#fff;text-shadow:2px 2px 0 #333;}
+#htimer .tl{font-size:clamp(5px,0.8vw,9px);color:#445;letter-spacing:4px;margin-bottom:2px;}
+#hlap{position:absolute;top:8px;right:10px;text-align:right;font-family:'Press Start 2P',monospace;}
+#hlap .lv{font-size:clamp(11px,2vw,21px);color:#ffdd00;}
+#hlap .ll{font-size:clamp(5px,0.75vw,8px);color:#445;letter-spacing:3px;}
+#hcar{position:absolute;top:8px;left:10px;font-family:'Press Start 2P',monospace;font-size:clamp(5px,0.75vw,8px);color:#ffdd00;letter-spacing:2px;line-height:2;}
+#hrpm{position:absolute;bottom:34px;left:10px;width:clamp(75px,11vw,130px);}
+#hrpm .rl{font-family:'Press Start 2P',monospace;font-size:7px;color:#553;letter-spacing:2px;margin-bottom:2px;}
+#rpmT{height:5px;background:#0a0a00;border:1px solid #332200;}
+#rpmF{height:100%;width:0%;background:linear-gradient(90deg,#cc3300,#ff6600,#ffcc00);}
+#countdown{position:absolute;top:40%;left:50%;transform:translate(-50%,-50%);font-family:'Press Start 2P',monospace;font-size:clamp(60px,12vw,130px);color:#fff;text-shadow:4px 4px 0 #333,0 0 60px rgba(255,255,255,0.4);display:none;animation:cpop 0.5s ease-out;pointer-events:none;z-index:20;}
+@keyframes cpop{0%{transform:translate(-50%,-50%) scale(2);opacity:0;}100%{transform:translate(-50%,-50%) scale(1);opacity:1;}}
+#winner{position:absolute;top:38%;left:50%;transform:translate(-50%,-50%);font-family:'Press Start 2P',monospace;font-size:clamp(16px,3.2vw,36px);color:#ffdd00;text-shadow:4px 4px 0 #cc8800;display:none;animation:cpop 0.6s ease-out;pointer-events:none;z-index:20;text-align:center;line-height:2;}
+#mctrl{position:absolute;bottom:0;left:0;width:100%;height:155px;display:none;pointer-events:none;}
+.cbtn{position:absolute;pointer-events:all;width:clamp(62px,10vw,84px);height:clamp(62px,10vw,84px);background:rgba(255,221,0,0.06);border:2px solid rgba(255,221,0,0.2);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:22px;user-select:none;-webkit-user-select:none;}
+#cbl{left:14px;bottom:14px;}
+#cbr{left:calc(14px + clamp(66px,11vw,92px));bottom:14px;}
+#cbg{right:14px;bottom:14px;border-color:rgba(0,255,100,0.3);background:rgba(0,255,100,0.06);}
+#cbb{right:calc(14px + clamp(66px,11vw,92px));bottom:14px;border-color:rgba(255,80,80,0.3);background:rgba(255,80,80,0.06);}
+</style>
+</head>
+<body>
+<canvas id="gc"></canvas>
+<div id="hud">
+  <div id="hcar">ŠKODA RACER</div>
+  <div id="htimer"><div class="tl">ČAS KOLA</div><div class="tv" id="tv">0:00.00</div></div>
+  <div id="hlap"><div class="ll">KOLO</div><div class="lv" id="lv">1/3</div></div>
+  <div id="hspeed"><div class="sv" id="sv">0</div><div class="su">KM/H</div></div>
+  <div id="hgear"><div class="gv" id="gv">N</div><div class="gl">GEAR</div></div>
+  <div id="hrpm"><div class="rl">RPM</div><div id="rpmT"><div id="rpmF"></div></div></div>
+  <div id="camtoggle" style="position:absolute;top:8px;left:50%;transform:translateX(-50%) translateX(-120px);font-family:'Press Start 2P',monospace;font-size:9px;color:#44aaff;border:1px solid #44aaff;padding:4px 10px;background:#000a18;cursor:pointer;pointer-events:all;letter-spacing:1px;user-select:none;">📷 KOKPIT [C]</div>
+  <div id="mctrl">
+    <div class="cbtn" id="cbl">◀</div><div class="cbtn" id="cbr">▶</div>
+    <div class="cbtn" id="cbg">⬆</div><div class="cbtn" id="cbb">⬇</div>
+  </div>
+</div>
+<div id="countdown"></div>
+<div id="winner">🏁 CÍLEM! 🏁</div>
+
+<div class="screen" id="menu-screen">
+  <div class="wins-badge" id="wbadge">VÝHRY: 0<br>AUTA: 1/9</div>
+  <div class="logo">ŠKODA RACER</div>
+  <div class="logo-sub">ZÁVODNÍ LEGENDA</div>
+  <div class="stitle">── VYBER AUTO ──</div>
+  <div class="cars-grid" id="cgrid"></div>
+  <div id="car-preview-wrap">
+    <div id="cprev-lbl" class="car-preview-label">NÁHLED</div>
+    <canvas id="cprev" width="220" height="110"></canvas>
+  </div>
+  <div class="stitle">── VYBER TRAŤ ──</div>
+  <div class="tracks-row" id="trow"></div>
+  <button class="btn" id="bstart">▶ ZÁVODIT</button>
+</div>
+
+<div class="screen" id="result-screen">
+  <div class="rt" id="rt">CÍLEM!</div>
+  <div class="rlbl">ČAS ZÁVODU</div>
+  <div class="rtm" id="rtm">0:00.00</div>
+  <div class="rbest" id="rb"></div>
+  <div class="runlk" id="ru"></div>
+  <button class="btn" id="bagain">▶ ZNOVU</button>
+  <button class="btn btn-sec" id="bmenu">◀ MENU</button>
+</div>
+
+<script>
+// ═══════════ CONSTANTS ═══════════
+const SEG=200, RW=2200, CAM_H=1050, CAM_D=0.84, DD=300;
+// SPEED_SCALE=16: 105 (115km/h) → 3 laps ~70s, 130RS (228km/h) → ~35s
+const SPEED_SCALE = 16;
+
+// ═══════════ CARS ═══════════
+// spd = max speed in km/h  |  ac = acceleration 0-1  |  hd = handling 0-1
+const CARS=[
+  {id:'s105',   n:'Škoda 105',   y:'1976–90',ico:'🚗',spd:115,ac:0.62,hd:0.50,col:'#cc2222',ulk:0, dt:'simple'},
+  {id:'s120',   n:'Škoda 120',   y:'1976–90',ico:'🚙',spd:128,ac:0.68,hd:0.56,col:'#2244cc',ulk:2, dt:'simple'},
+  {id:'rapid',  n:'Škoda Rapid', y:'1984–90',ico:'🏎',spd:140,ac:0.74,hd:0.64,col:'#1a8822',ulk:5, dt:'simple'},
+  {id:'garde',  n:'Škoda Garde', y:'1981–84',ico:'🚓',spd:142,ac:0.75,hd:0.66,col:'#884400',ulk:8, dt:'simple'},
+  {id:'favorit',n:'Škoda Favorit',y:'1987–95',ico:'🚕',spd:155,ac:0.80,hd:0.72,col:'#cc8800',ulk:12,dt:'simple'},
+  {id:'forman', n:'Škoda Forman',y:'1990–95',ico:'🚐',spd:148,ac:0.78,hd:0.65,col:'#225588',ulk:16,dt:'simple'},
+  {id:'felicia',n:'Škoda Felicia',y:'1994–95',ico:'⚡',spd:168,ac:0.85,hd:0.79,col:'#cc3388',ulk:22,dt:'simple'},
+  {id:'s110r',  n:'Škoda 110R',  y:'1970–80',ico:'🔶',spd:195,ac:0.91,hd:0.87,col:'#e85500',ulk:28,dt:'r110'},
+  {id:'s130rs', n:'Škoda 130 RS',y:'1975–82',ico:'🏆',spd:228,ac:0.97,hd:0.93,col:'#ffffff',ulk:36,dt:'rs130'},
+];
+const TRACKS=[
+  {id:'city',  n:'Plzeňský Okruh',  ico:'🏙',desc:'Krátký & ostrý\nMěstské ulice', lk:0, laps:3,env:'night'},
+  {id:'forest',n:'Šumavská Rally',  ico:'🌲',desc:'Hornatý terén\nSerpentiny',     lk:6, laps:3,env:'forest'},
+  {id:'gp',    n:'Grand Prix Okruh',ico:'🏁',desc:'Profesionální\nVysoké rychlosti',lk:14,laps:3,env:'day'},
+];
+const TDEFS={
+  // Kratší segmenty = kratší trať = laps trvají ~70s při správné rychlosti
+  // bar: lateral barrier position in RW units (positive=right, negative=left)
+  city:[
+    {n:20,c:0},
+    {n:14,c:3.2},
+    {n:5,c:0,bar:0.30},   // kužel vpravo za zatáčkou
+    {n:6,c:0},
+    {n:16,c:-3.8},
+    {n:5,c:0,bar:-0.28},  // kužel vlevo za zatáčkou
+    {n:7,c:0},
+    {n:12,c:0},
+    {n:14,c:2.5},
+    {n:5,c:0,bar:0.00},   // kužel uprostřed!
+    {n:5,c:0},
+    {n:10,c:0},
+    {n:13,c:-3.0},
+    {n:5,c:0,bar:-0.20},
+    {n:13,c:0},
+    {n:10,c:4.2},
+    {n:10,c:-4.2},
+    {n:16,c:0},
+  ],
+  forest:[
+    {n:16,c:0,h:0},
+    {n:18,c:2.5,h:30},
+    {n:5,c:0,h:0,bar:0.25},
+    {n:10,c:-5,h:22},
+    {n:13,c:0,h:-25},
+    {n:18,c:3.8,h:40},
+    {n:5,c:0,h:0,bar:-0.30},
+    {n:10,c:-3.8,h:-35},
+    {n:20,c:0,h:0},
+    {n:5,c:0,h:0,bar:0.10},  // kužel skoro uprostřed
+    {n:7,c:6,h:22},
+    {n:11,c:-6,h:0},
+    {n:5,c:0,h:0,bar:-0.15},
+    {n:17,c:0,h:0},
+  ],
+  gp:[
+    {n:28,c:0},
+    {n:11,c:2.8},
+    {n:5,c:0,bar:0.20},
+    {n:6,c:-2.8},
+    {n:28,c:0,h:10},
+    {n:11,c:3.8},
+    {n:5,c:0,bar:-0.25},
+    {n:23,c:-1.2,h:-10},
+    {n:28,c:0},
+    {n:5,c:0,bar:0.00},   // GP - kužel uprostřed na rovince
+    {n:6,c:5},
+    {n:11,c:-5},
+    {n:5,c:0,bar:0.18},
+    {n:23,c:0},
+  ],
+};
+
+// ═══════════ SAVE ═══════════
+let sav=JSON.parse(localStorage.getItem('skodaR3')||'{}');
+let wins=sav.w||0, bests=sav.b||{};
+function persist(){localStorage.setItem('skodaR3',JSON.stringify({w:wins,b:bests}));}
+
+let selCar=0, selTrack=0;
+
+// ═══════════ CANVAS ═══════════
+const canvas=document.getElementById('gc');
+let ctx=canvas.getContext('2d');
+let W,H;
+function resize(){W=canvas.width=window.innerWidth;H=canvas.height=window.innerHeight;}
+resize();
+window.addEventListener('resize',resize);
+
+// ═══════════ INPUT ═══════════
+const keys={},tc={l:0,r:0,g:0,b:0};
+window.addEventListener('keydown',e=>{keys[e.code]=1;['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code)&&e.preventDefault();
+  if(e.code==='KeyC'&&gstate==='racing') toggleCam();
+});
+window.addEventListener('keyup',e=>{keys[e.code]=0;});
+[['cbl','l'],['cbr','r'],['cbg','g'],['cbb','b']].forEach(([id,k])=>{
+  const el=document.getElementById(id);
+  el.addEventListener('touchstart',e=>{e.preventDefault();tc[k]=1;},{passive:false});
+  el.addEventListener('touchend',e=>{e.preventDefault();tc[k]=0;},{passive:false});
+});
+const isL=()=>keys.ArrowLeft||keys.KeyA||tc.l;
+const isR=()=>keys.ArrowRight||keys.KeyD||tc.r;
+const isG=()=>keys.ArrowUp||keys.KeyW||tc.g;
+const isB=()=>keys.ArrowDown||keys.KeyS||tc.b;
+
+// ═══════════ TRACK ═══════════
+let track=[],trackLen=0;
+function buildTrack(id){
+  track=[];
+  let x=0,dx=0,y=0;
+  for(const seg of TDEFS[id]){
+    for(let j=0;j<seg.n;j++){
+      const even=(track.length%2)===0;
+      const r=Math.random();
+      dx+=(seg.c||0)/seg.n;
+      x+=dx; y+=(seg.h||0)/seg.n;
+      // bar: place barrier only on first segment of each def-entry
+      const hasBar = (seg.bar!==undefined) && j===Math.floor(seg.n/2);
+      track.push({
+        x,y,curve:seg.c||0,
+        road:even?'#4a4a4a':'#3d3d3d',
+        grass:even?'#2d6b2d':'#357035',
+        rumble:even?'#cc2222':'#eeeeee',
+        obj:r<0.04?'tree':r<0.055?'sign':null,
+        stxt:['ŠKODA','PLZEŇ','MLADA\nBOLESLAV','MOTOR\nŠPORT','ZÁVOD'][Math.floor(Math.random()*5)],
+        bar: hasBar ? seg.bar : null,
+      });
+    }
+  }
+  trackLen=track.length*SEG;
+}
+
+// ═══════════ PROJECTION ═══════════
+function proj(wx,wy,wz){
+  if(wz<=0)return null;
+  const sc=CAM_D/wz;
+  return{sx:W/2+sc*wx*W/2, sy:H/2-sc*(wy-CAM_H)*H/2, scale:sc*RW*W/2};
+}
+
+// ═══════════ CAR STATE ═══════════
+let car={x:0,z:0,speed:0,maxSpd:0,accel:0,hdl:0,col:'#cc2222'};
+let gstate='menu',lapStart=0,lapNo=1,lapTimes=[],done=false,totalLaps=3;
+// camMode: 'chase' = behind car,  'cockpit' = first person
+let camMode='chase';
+let camX = 0; // smooth camera x
+function initCar(){
+  const c=CARS[selCar];
+  // maxSpd in internal units: km/h * SPEED_SCALE → pixels/s along track
+  Object.assign(car,{x:0,z:0,speed:0,maxSpd:c.spd*SPEED_SCALE,accel:c.ac,hdl:c.hd,col:c.col,dt:c.dt});
+}
+
+// ═══════════ ROAD DRAWING ═══════════
+function drawSeg(x1,y1,w1,x2,y2,w2,road,rumble,grass){
+  ctx.fillStyle=grass;
+  ctx.fillRect(0,y2,W,Math.max(1,y1-y2));
+  ctx.fillStyle=road;
+  ctx.beginPath();
+  ctx.moveTo(x1-w1,y1);ctx.lineTo(x1+w1,y1);ctx.lineTo(x2+w2,y2);ctx.lineTo(x2-w2,y2);
+  ctx.fill();
+  const rw1=w1*0.12,rw2=w2*0.12;
+  ctx.fillStyle=rumble;
+  ctx.beginPath();ctx.moveTo(x1-w1-rw1,y1);ctx.lineTo(x1-w1,y1);ctx.lineTo(x2-w2,y2);ctx.lineTo(x2-w2-rw2,y2);ctx.fill();
+  ctx.beginPath();ctx.moveTo(x1+w1,y1);ctx.lineTo(x1+w1+rw1,y1);ctx.lineTo(x2+w2+rw2,y2);ctx.lineTo(x2+w2,y2);ctx.fill();
+  if((Math.floor(y1/22))%2===0){
+    ctx.fillStyle='rgba(255,255,255,0.6)';
+    const lw=Math.max(1,w1*0.018);
+    ctx.fillRect(x1-lw,y2,lw*2,y1-y2);
+  }
+}
+function drawTree(sx,sy,sc){
+  const h=sc*3.0*H,w=sc*1.1*H;
+  ctx.fillStyle='#4a2e12';ctx.fillRect(sx-sc*0.11*H,sy-h*0.20,sc*0.22*H,h*0.20);
+  const greens=['#1a5c1a','#1e6e1e','#235f23'];
+  for(let i=0;i<3;i++){
+    ctx.fillStyle=greens[i%3];
+    const ly=sy-h*(0.16+i*0.26),lw=w*(0.9-i*0.18);
+    ctx.beginPath();ctx.moveTo(sx,ly-h*0.26);ctx.lineTo(sx+lw,ly);ctx.lineTo(sx-lw,ly);ctx.fill();
+  }
+}
+function drawSign(sx,sy,sc,txt){
+  const bw=sc*2.4*H,bh=sc*1.4*H,py=sy-bh*2.0;
+  ctx.fillStyle='#111';ctx.fillRect(sx-sc*0.03*H,py-bh,sc*0.06*H,bh);
+  ctx.fillStyle='#cc0000';ctx.fillRect(sx-bw/2,py-bh,bw,bh);
+  ctx.fillStyle='#fff';ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.font=`bold ${Math.max(8,bh*0.32)}px VT323,monospace`;
+  const lines=txt.split('\n');
+  lines.forEach((l,i)=>ctx.fillText(l,sx,py-bh/2+(i-(lines.length-1)/2)*bh*0.35));
+}
+// Traffic cone — orange with white band
+function drawCone(sx,sy,sc){
+  const h=sc*2.2*H, wb=sc*0.55*H;
+  // Shadow
+  ctx.fillStyle='rgba(0,0,0,0.3)';
+  ctx.beginPath();ctx.ellipse(sx,sy,wb*0.7,wb*0.18,0,0,Math.PI*2);ctx.fill();
+  // Body
+  ctx.fillStyle='#ff5500';
+  ctx.beginPath();ctx.moveTo(sx,sy-h);ctx.lineTo(sx+wb/2,sy);ctx.lineTo(sx-wb/2,sy);ctx.closePath();ctx.fill();
+  // White band
+  const by=sy-h*0.38, bh2=h*0.14;
+  ctx.fillStyle='#fff';
+  ctx.beginPath();
+  const bl=(wb/2)*(1-0.38);
+  ctx.moveTo(sx-bl,by);ctx.lineTo(sx+bl,by);ctx.lineTo(sx+bl*(1-bh2/h*2),by+bh2);ctx.lineTo(sx-bl*(1-bh2/h*2),by+bh2);ctx.closePath();ctx.fill();
+  // Outline
+  ctx.strokeStyle='rgba(0,0,0,0.4)';ctx.lineWidth=0.8;
+  ctx.beginPath();ctx.moveTo(sx,sy-h);ctx.lineTo(sx+wb/2,sy);ctx.lineTo(sx-wb/2,sy);ctx.closePath();ctx.stroke();
+}
+
+// ═══════════ RENDER SCENE ═══════════
+function renderScene(){
+  if(camMode==='cockpit') renderCockpit();
+  else                    renderChase();
+}
+
+// shared road-drawing logic
+function renderRoad(camH2, camD2){
+  const env=TRACKS[selTrack].env;
+  const hY=H*0.44;
+  drawSky(env,hY);
+  ctx.fillStyle=env==='forest'?'#1e4a1e':env==='night'?'#1a1a1a':'#2a5a2a';
+  ctx.fillRect(0,hY,W,H-hY);
+
+  const startS=Math.floor(car.z/SEG);
+  let projY=H,curveX=0,curveDX=0;
+  const objs=[];
+  for(let i=0;i<DD;i++){
+    const si=(startS+i)%track.length;
+    const seg=track[si];
+    const z1=(i)*SEG-(car.z%SEG), z2=(i+1)*SEG-(car.z%SEG);
+    if(z1<=0)continue;
+    curveDX+=(seg.curve||0)*0.00055;  // was 0.00028 — doubles visual curve pull
+    curveX+=curveDX;
+    function p2d(wx,wy,wz){
+      if(wz<=0)return null;
+      const sc=camD2/wz;
+      return{sx:W/2+sc*wx*W/2, sy:H/2-sc*(wy-camH2)*H/2, scale:sc*RW*W/2};
+    }
+    const p1=p2d(curveX*RW-camX,seg.y||0,z1);
+    const p2=p2d(curveX*RW-camX,seg.y||0,z2);
+    if(!p1||!p2||p1.sy>projY||p2.sy<0)continue;
+    projY=p1.sy;
+    if(si<2){
+      for(let c=0;c<8;c++){
+        ctx.fillStyle=c%2===0?'#fff':'#000';
+        const fw=p1.scale*0.25;
+        ctx.fillRect(p1.sx-p1.scale+c*fw,p2.sy,fw,p1.sy-p2.sy+1);
+      }
+    } else {
+      drawSeg(p1.sx,p1.sy,p1.scale,p2.sx,p2.sy,p2.scale,seg.road,seg.rumble,seg.grass);
+    }
+    if(seg.obj&&p1.scale>0.0008&&p1.scale<0.07){
+      objs.push({type:seg.obj,lx:p1.sx-p1.scale*1.0-RW*1.4*p1.scale,rx:p1.sx+p1.scale*1.0+RW*1.4*p1.scale,y:p1.sy,sc:p1.scale,txt:seg.stxt});
+    }
+    // Traffic cone on road surface
+    if(seg.bar!==null&&seg.bar!==undefined&&p1.scale>0.0008&&p1.scale<0.10){
+      // cone world-x = seg.bar * RW, relative to road center
+      // screen-x = road_center_sx + seg.bar*RW * scale
+      const coneX = p1.sx + seg.bar * RW * p1.scale / RW;
+      objs.push({type:'cone', cx:coneX, y:p1.sy, sc:p1.scale});
+    }
+  }
+  for(let j=objs.length-1;j>=0;j--){
+    const o=objs[j];
+    if(o.type==='tree'){drawTree(o.lx,o.y,o.sc);drawTree(o.rx,o.y,o.sc);}
+    else if(o.type==='sign'){drawSign(o.lx,o.y,o.sc,o.txt);drawSign(o.rx,o.y,o.sc,o.txt);}
+    else if(o.type==='cone'){drawCone(o.cx,o.y,o.sc);}
+  }
+}
+
+function drawSky(env,hY){
+  const sg=ctx.createLinearGradient(0,0,0,hY);
+  if(env==='night'){sg.addColorStop(0,'#02020f');sg.addColorStop(1,'#0a0a30');}
+  else if(env==='forest'){sg.addColorStop(0,'#062010');sg.addColorStop(1,'#0f3820');}
+  else{sg.addColorStop(0,'#0a1a3c');sg.addColorStop(1,'#1a3a6c');}
+  ctx.fillStyle=sg;ctx.fillRect(0,0,W,hY+2);
+  if(env==='night'){
+    for(let i=0;i<80;i++){
+      const sx=((i*177+31)%1000)/1000*W,sy=((i*239+7)%1000)/1000*hY*0.88;
+      ctx.fillStyle=`rgba(255,255,255,${0.15+((i%4)*0.18)})`;
+      ctx.fillRect(sx,sy,1+(i%2),1+(i%2));
+    }
+  }
+  ctx.fillStyle='rgba(255,180,50,0.055)';ctx.fillRect(0,hY-25,W,30);
+}
+
+function renderChase(){
+  renderRoad(CAM_H, CAM_D);
+  // Dashboard bar
+  const dashH=Math.floor(H*0.085);
+  const dg=ctx.createLinearGradient(0,H-dashH,0,H);
+  dg.addColorStop(0,'#111108');dg.addColorStop(1,'#000000');
+  ctx.fillStyle=dg; ctx.fillRect(0,H-dashH,W,dashH);
+  ctx.strokeStyle='#ffdd0044';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(0,H-dashH);ctx.lineTo(W,H-dashH);ctx.stroke();
+  drawPlayerCar();
+  drawSpeedEffect();
+}
+
+function renderCockpit(){
+  renderRoad(CAM_H*0.60, 1.05);
+  drawCockpitInterior();
+  drawSpeedEffect();
+}
+
+// ──── COCKPIT INTERIOR ────
+function drawCockpitInterior(){
+  const cdef=CARS[selCar];
+  const col=cdef.col;
+  const darkcol=lc(col,'#000000',0.65);
+  const cx=W/2;
+
+  const dashTop=H*0.68;
+
+  // Main dash + pillars
+  ctx.fillStyle=darkcol;
+  ctx.beginPath();
+  ctx.moveTo(0,H); ctx.lineTo(W,H); ctx.lineTo(W,dashTop);
+  ctx.bezierCurveTo(W*0.75,dashTop*0.95,W*0.25,dashTop*0.95,0,dashTop);
+  ctx.closePath(); ctx.fill();
+
+  const dg=ctx.createLinearGradient(0,dashTop,0,H);
+  dg.addColorStop(0,lc(col,'#000000',0.5));
+  dg.addColorStop(0.3,lc(col,'#000000',0.72));
+  dg.addColorStop(1,'#000000');
+  ctx.fillStyle=dg;
+  ctx.beginPath();
+  ctx.moveTo(0,H); ctx.lineTo(W,H); ctx.lineTo(W,dashTop);
+  ctx.bezierCurveTo(W*0.75,dashTop*0.95,W*0.25,dashTop*0.95,0,dashTop);
+  ctx.closePath(); ctx.fill();
+
+  // Left A-pillar
+  ctx.fillStyle=darkcol;
+  ctx.beginPath();
+  ctx.moveTo(0,0); ctx.lineTo(W*0.11,0); ctx.lineTo(W*0.155,dashTop); ctx.lineTo(0,dashTop+20);
+  ctx.closePath(); ctx.fill();
+  // Right A-pillar
+  ctx.beginPath();
+  ctx.moveTo(W,0); ctx.lineTo(W-W*0.11,0); ctx.lineTo(W-W*0.155,dashTop); ctx.lineTo(W,dashTop+20);
+  ctx.closePath(); ctx.fill();
+
+  // Windshield top bar
+  ctx.fillStyle=lc(darkcol,'#000',0.3);
+  ctx.fillRect(0,0,W,H*0.055);
+
+  // Hood hint
+  const hoodGrad=ctx.createLinearGradient(0,dashTop-50,0,dashTop+20);
+  hoodGrad.addColorStop(0,'rgba(0,0,0,0)');
+  hoodGrad.addColorStop(1,col+'bb');
+  ctx.fillStyle=hoodGrad;
+  ctx.fillRect(W*0.16,dashTop-40,W*0.68,60);
+
+  // ── Steering wheel ──
+  const swX=cx, swY=H*0.88, swR=Math.min(W,H)*0.092;
+  ctx.strokeStyle=lc(col,'#333',0.4);
+  ctx.lineWidth=Math.max(6,swR*0.17);
+  ctx.beginPath(); ctx.arc(swX,swY,swR,0,Math.PI*2); ctx.stroke();
+  ctx.strokeStyle='#2a2a2a'; ctx.lineWidth=Math.max(4,swR*0.10);
+  for(let s=0;s<3;s++){
+    const a=-Math.PI/2+s*(Math.PI*2/3);
+    ctx.beginPath();
+    ctx.moveTo(swX+Math.cos(a)*swR*0.14,swY+Math.sin(a)*swR*0.14);
+    ctx.lineTo(swX+Math.cos(a)*swR*0.87,swY+Math.sin(a)*swR*0.87);
+    ctx.stroke();
+  }
+  ctx.fillStyle=col;
+  ctx.beginPath(); ctx.arc(swX,swY,swR*0.15,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle='#fff';
+  ctx.font=`bold ${Math.max(7,swR*0.15)}px Press Start 2P,monospace`;
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText('Š',swX,swY);
+
+  // ── Instrument cluster ──
+  const icX=cx, icY=H*0.775, icW=W*0.22, icH=H*0.095;
+  ctx.fillStyle='#080806'; ctx.strokeStyle='#2a2a2a'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.roundRect(icX-icW/2,icY-icH/2,icW,icH,5); ctx.fill(); ctx.stroke();
+
+  const spdKmh=car.speed/SPEED_SCALE;
+  const maxKmh=CARS[selCar].spd;
+  const spdRatio=Math.min(spdKmh/maxKmh,1);
+  const rpmRatio=car.speed/car.maxSpd;
+
+  // Speedo
+  const ax=icX-icW*0.27, ay=icY, ar=icH*0.37;
+  ctx.strokeStyle='#1a1a1a'; ctx.lineWidth=3;
+  ctx.beginPath(); ctx.arc(ax,ay,ar,-Math.PI*0.85,Math.PI*0.05); ctx.stroke();
+  ctx.strokeStyle=spdRatio>0.85?'#ff2200':spdRatio>0.6?'#ff8800':'#00cc44';
+  ctx.lineWidth=3;
+  ctx.beginPath(); ctx.arc(ax,ay,ar,-Math.PI*0.85,-Math.PI*0.85+spdRatio*Math.PI*0.9); ctx.stroke();
+  ctx.fillStyle='#ddd'; ctx.font=`bold ${icH*0.26}px VT323,monospace`; ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText(Math.round(spdKmh),ax,ay+icH*0.05);
+  ctx.fillStyle='#444'; ctx.font=`${icH*0.16}px VT323,monospace`;
+  ctx.fillText('KM/H',ax,ay+icH*0.30);
+
+  // Tacho
+  const tx=icX+icW*0.27, ty=icY;
+  ctx.strokeStyle='#1a1a1a'; ctx.lineWidth=3;
+  ctx.beginPath(); ctx.arc(tx,ty,ar,-Math.PI*0.85,Math.PI*0.05); ctx.stroke();
+  ctx.strokeStyle=rpmRatio>0.88?'#ff0000':rpmRatio>0.7?'#ff6600':'#ffdd00';
+  ctx.lineWidth=3;
+  ctx.beginPath(); ctx.arc(tx,ty,ar,-Math.PI*0.85,-Math.PI*0.85+rpmRatio*Math.PI*0.9); ctx.stroke();
+  ctx.fillStyle='#ddd'; ctx.font=`bold ${icH*0.30}px VT323,monospace`; ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText(gearOf(car.speed,car.maxSpd),tx,ty);
+  ctx.fillStyle='#444'; ctx.font=`${icH*0.16}px VT323,monospace`;
+  ctx.fillText('GEAR',tx,ty+icH*0.30);
+
+  // Side mirrors (top corner)
+  const mirW=W*0.062, mirH=H*0.038, mirY=H*0.060;
+  [[W*0.12,W*0.123],[W-W*0.12-mirW,W-W*0.12-mirW+3]].forEach(([mx,imx])=>{
+    ctx.fillStyle='#111'; ctx.beginPath(); ctx.roundRect(mx,mirY,mirW,mirH,3); ctx.fill();
+    ctx.fillStyle='rgba(40,70,110,0.7)'; ctx.beginPath(); ctx.roundRect(imx,mirY+2,mirW-6,mirH-4,2); ctx.fill();
+    ctx.strokeStyle='rgba(255,255,255,0.1)'; ctx.lineWidth=1;
+    [0.3,0.6].forEach(f=>{
+      ctx.beginPath(); ctx.moveTo(imx+mirW*f,mirY+2); ctx.lineTo(imx+mirW*f,mirY+mirH-4); ctx.stroke();
+    });
+  });
+}
+
+// ──── SPEED EFFECT ────
+function drawSpeedEffect(){
+  const ratio=car.speed/car.maxSpd;
+  if(ratio<0.60) return;
+  const intensity=(ratio-0.60)/0.40;
+  ctx.strokeStyle=`rgba(255,255,255,${intensity*0.09})`;
+  ctx.lineWidth=1;
+  for(let l=0;l<18;l++){
+    const lx=(l/18)*W+(Math.random()-0.5)*W*0.12;
+    const ly1=H*0.08+Math.random()*H*0.52;
+    const len=(18+Math.random()*55)*intensity;
+    ctx.beginPath(); ctx.moveTo(lx,ly1); ctx.lineTo(lx,ly1+len); ctx.stroke();
+  }
+  if(intensity>0.55){
+    const v=ctx.createRadialGradient(W/2,H/2,H*0.22,W/2,H/2,H*0.72);
+    v.addColorStop(0,'rgba(0,0,0,0)');
+    v.addColorStop(1,`rgba(0,0,0,${(intensity-0.55)*0.45})`);
+    ctx.fillStyle=v; ctx.fillRect(0,0,W,H);
+  }
+}
+
+// ═══════════ CAR DRAWING ═══════════
+function drawPlayerCar(){
+  const def=CARS[selCar];
+  const dashH=Math.floor(H*0.085);
+  const cx=W/2+(car.x/RW)*W*0.28;
+  const cy=H-dashH;   // sit ON TOP of dashboard bar, not behind it
+  const sc=Math.min(W,H)*0.115;
+  const fns={'s105':drawCar105,'s120':drawCar120,'rapid':drawCarRapid,
+    'garde':drawCarGarde,'favorit':drawCarFavorit,'forman':drawCarForman,
+    'felicia':drawCarFelicia,'s110r':drawCar110R,'s130rs':drawCar130RS};
+  (fns[def.id]||drawCar105)(cx,cy,sc,def);
+}
+function rr(x,y,w,h,r){ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fill();}
+function lc(a,b,t){
+  // expand 3-char hex (#abc → #aabbcc) to avoid NaN from parseInt('')
+  const ex=s=>s.length===4?'#'+s[1]+s[1]+s[2]+s[2]+s[3]+s[3]:s;
+  a=ex(a);b=ex(b);
+  const p=s=>parseInt(s,16);
+  const r1=p(a.slice(1,3)),g1=p(a.slice(3,5)),b1=p(a.slice(5,7));
+  const r2=p(b.slice(1,3)),g2=p(b.slice(3,5)),b2=p(b.slice(5,7));
+  return'#'+[r1+(r2-r1)*t,g1+(g2-g1)*t,b1+(b2-b1)*t].map(v=>Math.round(v).toString(16).padStart(2,'0')).join('');
+}
+function drawShadow(cx,cy,sc,w){ctx.fillStyle='rgba(0,0,0,0.32)';ctx.beginPath();ctx.ellipse(cx,cy-sc*0.04,sc*w,sc*0.10,0,0,Math.PI*2);ctx.fill();}
+function drawTires(cx,cy,sc,wide){
+  const tw=wide?sc*0.27:sc*0.21,th=wide?sc*0.30:sc*0.25,off=wide?sc*0.96:sc*0.88;
+  ctx.fillStyle='#0e0e0e';
+  rr(cx-off-tw/2,cy-th,tw,th,4);rr(cx+off-tw/2,cy-th,tw,th,4);
+  ctx.fillStyle='#282828';
+  rr(cx-off-tw*0.43,cy-th*0.90,tw*0.86,th*0.78,3);
+  rr(cx+off-tw*0.43,cy-th*0.90,tw*0.86,th*0.78,3);
+  ctx.strokeStyle='#666';ctx.lineWidth=1.2;
+  [[cx-off,cy-th*0.5],[cx+off,cy-th*0.5]].forEach(([hx,hy])=>{
+    ctx.beginPath();ctx.moveTo(hx-tw*0.28,hy);ctx.lineTo(hx+tw*0.28,hy);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(hx,hy-th*0.26);ctx.lineTo(hx,hy+th*0.26);ctx.stroke();
+  });
+}
+function drawChromeBumper(cx,cy,sc,w){
+  const g=ctx.createLinearGradient(cx,cy-sc*0.13,cx,cy);
+  g.addColorStop(0,'#777');g.addColorStop(0.5,'#eee');g.addColorStop(1,'#666');
+  ctx.fillStyle=g;rr(cx-sc*w,cy-sc*0.13,sc*w*2,sc*0.13,2);
+}
+function drawRubberBumper(cx,cy,sc,w){
+  ctx.fillStyle='#1c1c1c';rr(cx-sc*w,cy-sc*0.12,sc*w*2,sc*0.12,2);
+  ctx.fillStyle='#2e2e2e';rr(cx-sc*w+4,cy-sc*0.09,sc*w*2-8,sc*0.04,1);
+}
+
+// ŠKODA 105 — zadovozný box sedan, horizontální světla přes celou šířku
+function drawCar105(cx,cy,sc,def){
+  const col=def.col;
+  drawShadow(cx,cy,sc,0.92);drawTires(cx,cy,sc,false);
+  const bg=ctx.createLinearGradient(cx-sc*0.74,0,cx+sc*0.74,0);
+  bg.addColorStop(0,lc(col,'#000',0.32));bg.addColorStop(0.45,col);bg.addColorStop(1,lc(col,'#000',0.32));
+  ctx.fillStyle=bg;
+  ctx.beginPath();ctx.moveTo(cx-sc*0.74,cy);ctx.lineTo(cx+sc*0.74,cy);
+  ctx.lineTo(cx+sc*0.72,cy-sc*0.38);ctx.lineTo(cx-sc*0.72,cy-sc*0.38);ctx.closePath();ctx.fill();
+  ctx.fillStyle=lc(col,'#000',0.25);
+  ctx.beginPath();ctx.moveTo(cx-sc*0.72,cy-sc*0.38);ctx.lineTo(cx+sc*0.72,cy-sc*0.38);
+  ctx.lineTo(cx+sc*0.44,cy-sc*0.40);ctx.lineTo(cx+sc*0.40,cy-sc*0.80);
+  ctx.lineTo(cx-sc*0.40,cy-sc*0.80);ctx.lineTo(cx-sc*0.44,cy-sc*0.40);ctx.closePath();ctx.fill();
+  ctx.fillStyle='rgba(75,125,165,0.65)';
+  ctx.beginPath();ctx.moveTo(cx-sc*0.36,cy-sc*0.41);ctx.lineTo(cx+sc*0.36,cy-sc*0.41);
+  ctx.lineTo(cx+sc*0.32,cy-sc*0.78);ctx.lineTo(cx-sc*0.32,cy-sc*0.78);ctx.closePath();ctx.fill();
+  // Ikonická světla – celá šířka zádi
+  ctx.fillStyle='#ff2200';
+  ctx.fillRect(cx-sc*0.70,cy-sc*0.30,sc*0.26,sc*0.10);
+  ctx.fillRect(cx+sc*0.44,cy-sc*0.30,sc*0.26,sc*0.10);
+  ctx.fillStyle='#ff8800';
+  ctx.fillRect(cx-sc*0.18,cy-sc*0.30,sc*0.36,sc*0.10);
+  ctx.strokeStyle=lc(col,'#000',0.50);ctx.lineWidth=1.5;
+  ctx.beginPath();ctx.moveTo(cx-sc*0.70,cy-sc*0.20);ctx.lineTo(cx+sc*0.70,cy-sc*0.20);ctx.stroke();
+  drawChromeBumper(cx,cy,sc,0.70);
+}
+
+// ŠKODA 120 — modernější 105, mírně oblená střecha
+function drawCar120(cx,cy,sc,def){
+  const col=def.col;
+  drawShadow(cx,cy,sc,0.92);drawTires(cx,cy,sc,false);
+  const bg=ctx.createLinearGradient(cx-sc*0.74,0,cx+sc*0.74,0);
+  bg.addColorStop(0,lc(col,'#000',0.30));bg.addColorStop(0.45,col);bg.addColorStop(1,lc(col,'#000',0.30));
+  ctx.fillStyle=bg;
+  ctx.beginPath();ctx.moveTo(cx-sc*0.74,cy);ctx.lineTo(cx+sc*0.74,cy);
+  ctx.lineTo(cx+sc*0.72,cy-sc*0.38);ctx.lineTo(cx-sc*0.72,cy-sc*0.38);ctx.closePath();ctx.fill();
+  ctx.fillStyle=lc(col,'#000',0.22);
+  ctx.beginPath();ctx.moveTo(cx-sc*0.72,cy-sc*0.38);ctx.lineTo(cx+sc*0.72,cy-sc*0.38);
+  ctx.lineTo(cx+sc*0.42,cy-sc*0.40);
+  ctx.bezierCurveTo(cx+sc*0.40,cy-sc*0.82,cx-sc*0.40,cy-sc*0.82,cx-sc*0.42,cy-sc*0.40);
+  ctx.closePath();ctx.fill();
+  ctx.fillStyle='rgba(80,138,180,0.65)';
+  ctx.beginPath();ctx.moveTo(cx-sc*0.34,cy-sc*0.41);ctx.lineTo(cx+sc*0.34,cy-sc*0.41);
+  ctx.bezierCurveTo(cx+sc*0.30,cy-sc*0.80,cx-sc*0.30,cy-sc*0.80,cx-sc*0.34,cy-sc*0.41);
+  ctx.closePath();ctx.fill();
+  ctx.fillStyle='#ff2200';rr(cx-sc*0.68,cy-sc*0.32,sc*0.20,sc*0.12,2);rr(cx+sc*0.48,cy-sc*0.32,sc*0.20,sc*0.12,2);
+  ctx.fillStyle='#cc6600';rr(cx-sc*0.14,cy-sc*0.32,sc*0.28,sc*0.12,1);
+  ctx.strokeStyle=lc(col,'#000',0.45);ctx.lineWidth=1.5;
+  ctx.beginPath();ctx.moveTo(cx-sc*0.70,cy-sc*0.20);ctx.lineTo(cx+sc*0.70,cy-sc*0.20);ctx.stroke();
+  drawChromeBumper(cx,cy,sc,0.70);
+}
+
+// ŠKODA RAPID — fastback kupé na základě 105, šikmá záď
+function drawCarRapid(cx,cy,sc,def){
+  const col=def.col;
+  drawShadow(cx,cy,sc,0.96);drawTires(cx,cy,sc,false);
+  const bg=ctx.createLinearGradient(cx-sc*0.76,0,cx+sc*0.76,0);
+  bg.addColorStop(0,lc(col,'#000',0.32));bg.addColorStop(0.45,col);bg.addColorStop(1,lc(col,'#000',0.32));
+  ctx.fillStyle=bg;
+  ctx.beginPath();ctx.moveTo(cx-sc*0.76,cy);ctx.lineTo(cx+sc*0.76,cy);
+  ctx.lineTo(cx+sc*0.72,cy-sc*0.38);ctx.lineTo(cx-sc*0.72,cy-sc*0.38);ctx.closePath();ctx.fill();
+  ctx.fillStyle=lc(col,'#000',0.20);
+  ctx.beginPath();ctx.moveTo(cx-sc*0.72,cy-sc*0.38);ctx.lineTo(cx+sc*0.72,cy-sc*0.38);
+  ctx.lineTo(cx+sc*0.54,cy-sc*0.42);
+  ctx.bezierCurveTo(cx+sc*0.38,cy-sc*0.76,cx+sc*0.10,cy-sc*0.90,cx,cy-sc*0.92);
+  ctx.bezierCurveTo(cx-sc*0.10,cy-sc*0.90,cx-sc*0.38,cy-sc*0.76,cx-sc*0.54,cy-sc*0.42);
+  ctx.closePath();ctx.fill();
+  ctx.fillStyle='rgba(80,148,200,0.60)';
+  ctx.beginPath();ctx.moveTo(cx-sc*0.50,cy-sc*0.40);ctx.lineTo(cx+sc*0.50,cy-sc*0.40);
+  ctx.bezierCurveTo(cx+sc*0.34,cy-sc*0.74,cx+sc*0.08,cy-sc*0.88,cx,cy-sc*0.90);
+  ctx.bezierCurveTo(cx-sc*0.08,cy-sc*0.88,cx-sc*0.34,cy-sc*0.74,cx-sc*0.50,cy-sc*0.40);
+  ctx.closePath();ctx.fill();
+  ctx.strokeStyle='rgba(0,0,0,0.30)';ctx.lineWidth=1.2;ctx.stroke();
+  ctx.fillStyle='#ff2200';
+  ctx.fillRect(cx-sc*0.70,cy-sc*0.30,sc*0.26,sc*0.09);
+  ctx.fillRect(cx+sc*0.44,cy-sc*0.30,sc*0.26,sc*0.09);
+  drawChromeBumper(cx,cy,sc,0.72);
+}
+
+// ŠKODA GARDE — nízký kabriolet/kupé, chrómový střešní ráfek
+function drawCarGarde(cx,cy,sc,def){
+  const col=def.col;
+  drawShadow(cx,cy,sc,0.96);drawTires(cx,cy,sc,false);
+  const bg=ctx.createLinearGradient(cx-sc*0.78,0,cx+sc*0.78,0);
+  bg.addColorStop(0,lc(col,'#000',0.34));bg.addColorStop(0.45,col);bg.addColorStop(1,lc(col,'#000',0.34));
+  ctx.fillStyle=bg;
+  ctx.beginPath();ctx.moveTo(cx-sc*0.78,cy);ctx.lineTo(cx+sc*0.78,cy);
+  ctx.lineTo(cx+sc*0.72,cy-sc*0.36);ctx.lineTo(cx-sc*0.72,cy-sc*0.36);ctx.closePath();ctx.fill();
+  ctx.fillStyle=lc(col,'#000',0.18);
+  ctx.beginPath();ctx.moveTo(cx-sc*0.72,cy-sc*0.36);ctx.lineTo(cx+sc*0.72,cy-sc*0.36);
+  ctx.lineTo(cx+sc*0.48,cy-sc*0.40);
+  ctx.bezierCurveTo(cx+sc*0.32,cy-sc*0.66,cx+sc*0.06,cy-sc*0.76,cx,cy-sc*0.78);
+  ctx.bezierCurveTo(cx-sc*0.06,cy-sc*0.76,cx-sc*0.32,cy-sc*0.66,cx-sc*0.48,cy-sc*0.40);
+  ctx.closePath();ctx.fill();
+  ctx.strokeStyle='#bbb';ctx.lineWidth=2.0;
+  ctx.beginPath();ctx.moveTo(cx-sc*0.48,cy-sc*0.40);
+  ctx.bezierCurveTo(cx-sc*0.32,cy-sc*0.66,cx-sc*0.06,cy-sc*0.76,cx,cy-sc*0.78);
+  ctx.bezierCurveTo(cx+sc*0.06,cy-sc*0.76,cx+sc*0.32,cy-sc*0.66,cx+sc*0.48,cy-sc*0.40);ctx.stroke();
+  ctx.fillStyle='rgba(88,152,200,0.58)';
+  ctx.beginPath();ctx.moveTo(cx-sc*0.46,cy-sc*0.38);ctx.lineTo(cx+sc*0.46,cy-sc*0.38);
+  ctx.bezierCurveTo(cx+sc*0.30,cy-sc*0.63,cx+sc*0.04,cy-sc*0.74,cx,cy-sc*0.76);
+  ctx.bezierCurveTo(cx-sc*0.04,cy-sc*0.74,cx-sc*0.30,cy-sc*0.63,cx-sc*0.46,cy-sc*0.38);
+  ctx.closePath();ctx.fill();
+  ctx.fillStyle='#ff2200';rr(cx-sc*0.68,cy-sc*0.28,sc*0.22,sc*0.10,2);rr(cx+sc*0.46,cy-sc*0.28,sc*0.22,sc*0.10,2);
+  ctx.fillStyle='#ff8800';rr(cx-sc*0.14,cy-sc*0.28,sc*0.28,sc*0.10,1);
+  ctx.strokeStyle='#bbb';ctx.lineWidth=1.5;
+  ctx.beginPath();ctx.moveTo(cx-sc*0.72,cy-sc*0.18);ctx.lineTo(cx+sc*0.72,cy-sc*0.18);ctx.stroke();
+  drawChromeBumper(cx,cy,sc,0.74);
+}
+
+// ŠKODA FAVORIT — přední pohon, hranatý hatchback, rovná záď
+function drawCarFavorit(cx,cy,sc,def){
+  const col=def.col;
+  drawShadow(cx,cy,sc,0.90);drawTires(cx,cy,sc,false);
+  const bg=ctx.createLinearGradient(cx-sc*0.72,0,cx+sc*0.72,0);
+  bg.addColorStop(0,lc(col,'#000',0.26));bg.addColorStop(0.45,col);bg.addColorStop(1,lc(col,'#000',0.26));
+  ctx.fillStyle=bg;
+  ctx.beginPath();ctx.moveTo(cx-sc*0.72,cy);ctx.lineTo(cx+sc*0.72,cy);
+  ctx.lineTo(cx+sc*0.68,cy-sc*0.40);ctx.lineTo(cx-sc*0.68,cy-sc*0.40);ctx.closePath();ctx.fill();
+  ctx.fillStyle=lc(col,'#000',0.22);
+  ctx.beginPath();ctx.moveTo(cx-sc*0.68,cy-sc*0.40);ctx.lineTo(cx+sc*0.68,cy-sc*0.40);
+  ctx.lineTo(cx+sc*0.48,cy-sc*0.44);ctx.lineTo(cx+sc*0.44,cy-sc*0.84);
+  ctx.lineTo(cx-sc*0.44,cy-sc*0.84);ctx.lineTo(cx-sc*0.48,cy-sc*0.44);ctx.closePath();ctx.fill();
+  ctx.fillStyle='rgba(88,152,196,0.62)';
+  ctx.beginPath();ctx.moveTo(cx-sc*0.40,cy-sc*0.43);ctx.lineTo(cx+sc*0.40,cy-sc*0.43);
+  ctx.lineTo(cx+sc*0.36,cy-sc*0.82);ctx.lineTo(cx-sc*0.36,cy-sc*0.82);ctx.closePath();ctx.fill();
+  ctx.strokeStyle='rgba(0,0,0,0.40)';ctx.lineWidth=1.5;
+  ctx.beginPath();ctx.moveTo(cx-sc*0.44,cy-sc*0.84);ctx.lineTo(cx+sc*0.44,cy-sc*0.84);ctx.stroke();
+  ctx.fillStyle='#ff2200';rr(cx-sc*0.66,cy-sc*0.33,sc*0.22,sc*0.13,3);rr(cx+sc*0.44,cy-sc*0.33,sc*0.22,sc*0.13,3);
+  ctx.fillStyle='rgba(255,255,255,0.75)';rr(cx-sc*0.14,cy-sc*0.33,sc*0.28,sc*0.13,2);
+  drawRubberBumper(cx,cy,sc,0.68);
+}
+
+// ŠKODA FORMAN — kombi, rovná vyšší záď, velké zadní sklo
+function drawCarForman(cx,cy,sc,def){
+  const col=def.col;
+  drawShadow(cx,cy,sc,0.93);drawTires(cx,cy,sc,false);
+  const bg=ctx.createLinearGradient(cx-sc*0.73,0,cx+sc*0.73,0);
+  bg.addColorStop(0,lc(col,'#000',0.26));bg.addColorStop(0.45,col);bg.addColorStop(1,lc(col,'#000',0.26));
+  ctx.fillStyle=bg;
+  ctx.beginPath();ctx.moveTo(cx-sc*0.73,cy);ctx.lineTo(cx+sc*0.73,cy);
+  ctx.lineTo(cx+sc*0.70,cy-sc*0.42);ctx.lineTo(cx-sc*0.70,cy-sc*0.42);ctx.closePath();ctx.fill();
+  // Rovná záď kombi (vysoké C-sloupky)
+  ctx.fillStyle=lc(col,'#000',0.20);
+  ctx.beginPath();ctx.moveTo(cx-sc*0.70,cy-sc*0.42);ctx.lineTo(cx+sc*0.70,cy-sc*0.42);
+  ctx.lineTo(cx+sc*0.68,cy-sc*0.44);ctx.lineTo(cx+sc*0.62,cy-sc*0.94);
+  ctx.lineTo(cx-sc*0.62,cy-sc*0.94);ctx.lineTo(cx-sc*0.68,cy-sc*0.44);ctx.closePath();ctx.fill();
+  ctx.fillStyle='rgba(82,144,190,0.60)';
+  ctx.beginPath();ctx.moveTo(cx-sc*0.56,cy-sc*0.44);ctx.lineTo(cx+sc*0.56,cy-sc*0.44);
+  ctx.lineTo(cx+sc*0.54,cy-sc*0.92);ctx.lineTo(cx-sc*0.54,cy-sc*0.92);ctx.closePath();ctx.fill();
+  ctx.strokeStyle=lc(col,'#000',0.48);ctx.lineWidth=1.5;
+  ctx.beginPath();ctx.moveTo(cx-sc*0.68,cy-sc*0.22);ctx.lineTo(cx+sc*0.68,cy-sc*0.22);ctx.stroke();
+  ctx.fillStyle='#ff2200';rr(cx-sc*0.68,cy-sc*0.37,sc*0.18,sc*0.18,2);rr(cx+sc*0.50,cy-sc*0.37,sc*0.18,sc*0.18,2);
+  ctx.fillStyle='#cc4400';rr(cx-sc*0.50,cy-sc*0.37,sc*0.18,sc*0.18,2);rr(cx+sc*0.32,cy-sc*0.37,sc*0.18,sc*0.18,2);
+  drawRubberBumper(cx,cy,sc,0.70);
+}
+
+// ŠKODA FELICIA — oblé tvary, moderní 90s hatchback
+function drawCarFelicia(cx,cy,sc,def){
+  const col=def.col;
+  drawShadow(cx,cy,sc,0.94);drawTires(cx,cy,sc,true);
+  const bg=ctx.createLinearGradient(cx-sc*0.74,0,cx+sc*0.74,0);
+  bg.addColorStop(0,lc(col,'#000',0.28));bg.addColorStop(0.45,col);bg.addColorStop(1,lc(col,'#000',0.28));
+  ctx.fillStyle=bg;
+  ctx.beginPath();ctx.moveTo(cx-sc*0.74,cy);ctx.lineTo(cx+sc*0.74,cy);
+  ctx.bezierCurveTo(cx+sc*0.76,cy,cx+sc*0.72,cy-sc*0.18,cx+sc*0.70,cy-sc*0.38);
+  ctx.lineTo(cx-sc*0.70,cy-sc*0.38);
+  ctx.bezierCurveTo(cx-sc*0.72,cy-sc*0.18,cx-sc*0.76,cy,cx-sc*0.74,cy);ctx.fill();
+  ctx.fillStyle=lc(col,'#000',0.20);
+  ctx.beginPath();ctx.moveTo(cx-sc*0.70,cy-sc*0.38);ctx.lineTo(cx+sc*0.70,cy-sc*0.38);
+  ctx.bezierCurveTo(cx+sc*0.52,cy-sc*0.42,cx+sc*0.40,cy-sc*0.86,cx+sc*0.36,cy-sc*0.88);
+  ctx.lineTo(cx-sc*0.36,cy-sc*0.88);
+  ctx.bezierCurveTo(cx-sc*0.40,cy-sc*0.86,cx-sc*0.52,cy-sc*0.42,cx-sc*0.70,cy-sc*0.38);
+  ctx.closePath();ctx.fill();
+  ctx.fillStyle='rgba(88,158,210,0.65)';
+  ctx.beginPath();ctx.moveTo(cx-sc*0.48,cy-sc*0.40);ctx.lineTo(cx+sc*0.48,cy-sc*0.40);
+  ctx.bezierCurveTo(cx+sc*0.36,cy-sc*0.68,cx+sc*0.28,cy-sc*0.84,cx+sc*0.24,cy-sc*0.86);
+  ctx.lineTo(cx-sc*0.24,cy-sc*0.86);
+  ctx.bezierCurveTo(cx-sc*0.28,cy-sc*0.84,cx-sc*0.36,cy-sc*0.68,cx-sc*0.48,cy-sc*0.40);
+  ctx.closePath();ctx.fill();
+  ctx.fillStyle='#ff1100';rr(cx-sc*0.68,cy-sc*0.32,sc*0.24,sc*0.11,4);rr(cx+sc*0.44,cy-sc*0.32,sc*0.24,sc*0.11,4);
+  ctx.fillStyle='rgba(255,200,0,0.9)';rr(cx-sc*0.42,cy-sc*0.32,sc*0.14,sc*0.11,3);rr(cx+sc*0.28,cy-sc*0.32,sc*0.14,sc*0.11,3);
+  ctx.strokeStyle='rgba(255,255,255,0.32)';ctx.lineWidth=1.5;
+  ctx.beginPath();ctx.moveTo(cx-sc*0.60,cy-sc*0.20);ctx.lineTo(cx+sc*0.60,cy-sc*0.20);ctx.stroke();
+  drawRubberBumper(cx,cy,sc,0.70);
+}
+
+// ŠKODA 110R — záďový motor, fastback oranžové kupé, kulatá 70s světla
+function drawCar110R(cx,cy,sc){
+  const col='#e85500';
+  drawShadow(cx,cy,sc,1.00);drawTires(cx,cy,sc,true);
+  const bg=ctx.createLinearGradient(cx-sc*0.84,0,cx+sc*0.84,0);
+  bg.addColorStop(0,lc(col,'#000',0.38));bg.addColorStop(0.45,col);bg.addColorStop(1,lc(col,'#000',0.38));
+  ctx.fillStyle=bg;
+  ctx.beginPath();ctx.moveTo(cx-sc*0.84,cy);ctx.lineTo(cx+sc*0.84,cy);
+  ctx.bezierCurveTo(cx+sc*0.90,cy,cx+sc*0.82,cy-sc*0.26,cx+sc*0.74,cy-sc*0.40);
+  ctx.lineTo(cx-sc*0.74,cy-sc*0.40);
+  ctx.bezierCurveTo(cx-sc*0.82,cy-sc*0.26,cx-sc*0.90,cy,cx-sc*0.84,cy);ctx.fill();
+  ctx.fillStyle=lc(col,'#000',0.18);
+  ctx.beginPath();ctx.moveTo(cx-sc*0.74,cy-sc*0.40);ctx.lineTo(cx+sc*0.74,cy-sc*0.40);
+  ctx.bezierCurveTo(cx+sc*0.58,cy-sc*0.54,cx+sc*0.28,cy-sc*0.84,cx+sc*0.10,cy-sc*0.88);
+  ctx.bezierCurveTo(cx-sc*0.10,cy-sc*0.88,cx-sc*0.28,cy-sc*0.84,cx-sc*0.58,cy-sc*0.54);
+  ctx.closePath();ctx.fill();
+  ctx.fillStyle='rgba(120,188,235,0.55)';
+  ctx.beginPath();ctx.moveTo(cx-sc*0.58,cy-sc*0.42);ctx.lineTo(cx+sc*0.58,cy-sc*0.42);
+  ctx.bezierCurveTo(cx+sc*0.44,cy-sc*0.56,cx+sc*0.22,cy-sc*0.82,cx+sc*0.08,cy-sc*0.86);
+  ctx.bezierCurveTo(cx-sc*0.08,cy-sc*0.86,cx-sc*0.22,cy-sc*0.82,cx-sc*0.58,cy-sc*0.42);
+  ctx.closePath();ctx.fill();
+  ctx.strokeStyle='rgba(0,0,0,0.40)';ctx.lineWidth=1.5;ctx.stroke();
+  // Kulatá 70s světla (2 páry)
+  [[cx-sc*0.58,'#ff2200'],[cx-sc*0.74,'#ff8800'],[cx+sc*0.58,'#ff2200'],[cx+sc*0.74,'#ff8800']].forEach(([lx,lc2])=>{
+    ctx.fillStyle=lc2;ctx.beginPath();ctx.arc(lx,cy-sc*0.25,sc*0.09,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,0.30)';ctx.beginPath();ctx.arc(lx-sc*0.02,cy-sc*0.27,sc*0.035,0,Math.PI*2);ctx.fill();
+  });
+  const g=ctx.createLinearGradient(cx,cy-sc*0.14,cx,cy);
+  g.addColorStop(0,'#888');g.addColorStop(0.5,'#eee');g.addColorStop(1,'#666');
+  ctx.fillStyle=g;rr(cx-sc*0.76,cy-sc*0.14,sc*1.52,sc*0.14,3);
+  ctx.fillStyle='#fff';ctx.font=`bold ${sc*0.10}px VT323,monospace`;ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.fillText('110R',cx,cy-sc*0.62);
+}
+
+// ŠKODA 130 RS — rally legenda, bílá s červeno-modrými pruhy, spojler
+function drawCar130RS(cx,cy,sc){
+  drawShadow(cx,cy,sc,1.06);
+  ctx.fillStyle='#cc0000';
+  ctx.beginPath();ctx.ellipse(cx-sc*0.86,cy-sc*0.08,sc*0.28,sc*0.10,0,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.ellipse(cx+sc*0.86,cy-sc*0.08,sc*0.28,sc*0.10,0,0,Math.PI*2);ctx.fill();
+  drawTires(cx,cy,sc,true);
+  ctx.fillStyle='#f0f0f0';
+  ctx.beginPath();ctx.moveTo(cx-sc*0.90,cy);ctx.lineTo(cx+sc*0.90,cy);
+  ctx.bezierCurveTo(cx+sc*0.96,cy,cx+sc*0.86,cy-sc*0.28,cx+sc*0.76,cy-sc*0.42);
+  ctx.lineTo(cx-sc*0.76,cy-sc*0.42);
+  ctx.bezierCurveTo(cx-sc*0.86,cy-sc*0.28,cx-sc*0.96,cy,cx-sc*0.90,cy);ctx.fill();
+  ctx.save();
+  ctx.beginPath();ctx.moveTo(cx-sc*0.90,cy);ctx.lineTo(cx+sc*0.90,cy);
+  ctx.bezierCurveTo(cx+sc*0.96,cy,cx+sc*0.86,cy-sc*0.28,cx+sc*0.76,cy-sc*0.42);
+  ctx.lineTo(cx-sc*0.76,cy-sc*0.42);
+  ctx.bezierCurveTo(cx-sc*0.86,cy-sc*0.28,cx-sc*0.96,cy,cx-sc*0.90,cy);ctx.clip();
+  ctx.fillStyle='#cc0000';ctx.fillRect(cx-sc*1.1,cy-sc*0.36,sc*2.2,sc*0.13);
+  ctx.fillStyle='#003388';ctx.fillRect(cx-sc*1.1,cy-sc*0.21,sc*2.2,sc*0.11);
+  ctx.restore();
+  ctx.fillStyle='#e6e6e6';
+  ctx.beginPath();ctx.moveTo(cx-sc*0.68,cy-sc*0.42);ctx.lineTo(cx+sc*0.68,cy-sc*0.42);
+  ctx.bezierCurveTo(cx+sc*0.52,cy-sc*0.72,cx+sc*0.22,cy-sc*0.88,cx+sc*0.06,cy-sc*0.90);
+  ctx.bezierCurveTo(cx-sc*0.06,cy-sc*0.90,cx-sc*0.22,cy-sc*0.88,cx-sc*0.68,cy-sc*0.42);
+  ctx.closePath();ctx.fill();
+  ctx.fillStyle='rgba(100,165,215,0.58)';
+  ctx.beginPath();ctx.moveTo(cx-sc*0.54,cy-sc*0.44);ctx.lineTo(cx+sc*0.54,cy-sc*0.44);
+  ctx.bezierCurveTo(cx+sc*0.40,cy-sc*0.70,cx+sc*0.18,cy-sc*0.84,cx+sc*0.04,cy-sc*0.88);
+  ctx.bezierCurveTo(cx-sc*0.04,cy-sc*0.88,cx-sc*0.18,cy-sc*0.84,cx-sc*0.54,cy-sc*0.44);
+  ctx.closePath();ctx.fill();
+  ctx.fillStyle='#888';
+  ctx.fillRect(cx-sc*0.40,cy-sc*0.88,sc*0.06,sc*0.20);ctx.fillRect(cx+sc*0.34,cy-sc*0.88,sc*0.06,sc*0.20);
+  ctx.fillStyle='#111';
+  ctx.beginPath();ctx.moveTo(cx-sc*0.56,cy-sc*0.88);ctx.lineTo(cx+sc*0.56,cy-sc*0.88);
+  ctx.lineTo(cx+sc*0.62,cy-sc*0.94);ctx.lineTo(cx-sc*0.62,cy-sc*0.94);ctx.closePath();ctx.fill();
+  ctx.fillStyle='#cc0000';ctx.fillRect(cx-sc*0.56,cy-sc*0.90,sc*1.12,sc*0.03);
+  ctx.fillStyle='#ff1a00';rr(cx-sc*0.74,cy-sc*0.32,sc*0.22,sc*0.12,2);rr(cx+sc*0.52,cy-sc*0.32,sc*0.22,sc*0.12,2);
+  ctx.fillStyle='rgba(255,255,255,0.85)';rr(cx-sc*0.22,cy-sc*0.32,sc*0.44,sc*0.12,1);
+  drawRubberBumper(cx,cy,sc,0.84);
+  ctx.fillStyle='#ffcc00';ctx.beginPath();ctx.arc(cx,cy-sc*0.63,sc*0.14,0,Math.PI*2);ctx.fill();
+  ctx.strokeStyle='#000';ctx.lineWidth=1.5;ctx.stroke();
+  ctx.fillStyle='#000';ctx.font=`bold ${sc*0.13}px Press Start 2P,monospace`;ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.fillText('11',cx,cy-sc*0.63);
+  if(car.speed>car.maxSpd*0.80){
+    ctx.fillStyle='rgba(255,220,0,0.80)';
+    for(let i=0;i<8;i++){
+      const sx=cx+(i%2?1:-1)*(sc*0.92+Math.random()*sc*0.30);
+      const sy=cy-sc*0.16-Math.random()*sc*0.52;
+      ctx.beginPath();ctx.arc(sx,sy,1+Math.random()*2.5,0,Math.PI*2);ctx.fill();
+    }
+  }
+}
+
+
+// ═══════════ PHYSICS ═══════════
+function update(dt){
+  if(gstate!=='racing')return;
+  const maxS=car.maxSpd;
+  // aF: how many internal units per frame (at 60fps) to add when gas pressed
+  // maxS for 105 = 115*22 = 2530. We want 0→max in ~3s at 60fps = 180 frames
+  // aF per frame = 2530/180 = 14. But car.accel scales it: 0.62*aF_base
+  // We want even snappier: base = 26 so 0.62*26 ≈ 16, 0→max in ~158 frames ≈ 2.6s
+  const aF = car.accel * 20;  // 0→max in ~2.5s for 105, faster for better cars
+  const bF = 25;               // strong braking
+  const fr  = 0.992;           // minimal rolling friction — stays fast
+  const tA  = car.hdl * 0.020;
+
+  if(isG())      car.speed = Math.min(car.speed + aF*dt*60, maxS);
+  else if(isB()) car.speed = Math.max(car.speed - bF*dt*60, -maxS*0.15);
+  else           car.speed *= Math.pow(fr, dt*60);
+
+  if(Math.abs(car.speed)<1) car.speed=0;
+
+  const si=Math.floor(car.z/SEG)%track.length;
+  const seg=track[si];
+
+  const speedRatio = Math.min(car.speed/maxS, 1);
+  const steerScale = 1.0 - speedRatio*0.30;
+  if(isL()) car.x -= tA * car.speed * steerScale * dt*60;
+  if(isR()) car.x += tA * car.speed * steerScale * dt*60;
+
+  // Gentle curve physics: centrifugal drift pushes car to outside of curve.
+  // Positive curve = right turn → car drifts LEFT (car.x decreases).
+  // Value 0.012 = about 43% of original 0.028 — noticeable but not overwhelming.
+  // drift disabled in v7_fixed (manual steering only)
+// Cone collision: check if car passes over a barrier segment
+  if(seg.bar!==null && seg.bar!==undefined){
+    const barWorldX = seg.bar * RW;   // barrier center in world-x coords
+    const hitRadius = RW * 0.18;      // how close = hit
+    if(Math.abs(car.x - barWorldX) < hitRadius){
+      // Bounce away from cone and lose speed
+      car.x += (car.x > barWorldX ? 1 : -1) * hitRadius * 0.6;
+      car.speed *= 0.60;
+    }
+  }
+
+  if(car.x >  RW*0.55){ car.x= RW*0.55; car.speed*=0.65; }
+  if(car.x < -RW*0.55){ car.x=-RW*0.55; car.speed*=0.65; }
+
+  car.z += car.speed * dt;
+  camX += (car.x - camX) * Math.min(1, dt * 8);
+  if(car.z<0) car.z=0;
+
+  if(car.z>=trackLen && !done){
+    done=true;
+    const t=Date.now()-lapStart;
+    lapTimes.push(t);
+    if(lapNo<totalLaps){
+      car.z%=trackLen; lapNo++; lapStart=Date.now(); done=false;
+      document.getElementById('lv').textContent=`${lapNo}/${totalLaps}`;
+    } else {
+      gstate='finished';
+      const tot=lapTimes.reduce((a,b)=>a+b,0);
+      const w=document.getElementById('winner'); w.style.display='block';
+      setTimeout(()=>w.style.display='none',2600);
+      setTimeout(()=>showResults(tot),700);
+    }
+  }
+
+  document.getElementById('tv').textContent=fmtT(Date.now()-lapStart);
+  document.getElementById('sv').textContent=Math.round(car.speed/SPEED_SCALE);
+  document.getElementById('gv').textContent=car.speed<0?'R':gearOf(car.speed,maxS);
+  document.getElementById('rpmF').style.width=(car.speed/maxS*100)+'%';
+}
+
+function fmtT(ms){
+  const m=Math.floor(ms/60000),s=Math.floor((ms%60000)/1000),cs=Math.floor((ms%1000)/10);
+  return`${m}:${String(s).padStart(2,'0')}.${String(cs).padStart(2,'0')}`;
+}
+// Cars with 4-speed gearbox: 105, 120, Rapid, Garde, Favorit
+// Cars with 5-speed: Forman, Felicia, 110R, 130RS
+function gearOf(spd,max){
+  const r=spd/max;
+  if(r<0.10)return'N';
+  const id=CARS[selCar].id;
+  const is4g=['s105','s120','rapid','garde','favorit'].includes(id);
+  if(is4g){
+    if(r<0.30)return'1'; if(r<0.55)return'2'; if(r<0.78)return'3'; return'4';
+  } else {
+    if(r<0.24)return'1'; if(r<0.44)return'2'; if(r<0.62)return'3'; if(r<0.82)return'4'; return'5';
+  }
+}
+
+// ═══════════ MENU CAR PREVIEW ═══════════
+function renderCarPreview(){
+  const pc=document.getElementById('cprev');
+  if(!pc) return;
+  const pw=pc.width, ph=pc.height;
+  const pctx=pc.getContext('2d');
+  // Dark background with subtle grid
+  pctx.fillStyle='#04080f'; pctx.fillRect(0,0,pw,ph);
+  // Grid lines
+  pctx.strokeStyle='rgba(68,100,170,0.15)'; pctx.lineWidth=1;
+  for(let gx=0;gx<pw;gx+=22){pctx.beginPath();pctx.moveTo(gx,0);pctx.lineTo(gx,ph);pctx.stroke();}
+  for(let gy=0;gy<ph;gy+=22){pctx.beginPath();pctx.moveTo(0,gy);pctx.lineTo(pw,gy);pctx.stroke();}
+  // Floor reflection
+  const fg=pctx.createLinearGradient(0,ph*0.72,0,ph);
+  fg.addColorStop(0,'rgba(40,80,180,0.12)'); fg.addColorStop(1,'rgba(0,0,0,0)');
+  pctx.fillStyle=fg; pctx.fillRect(0,ph*0.72,pw,ph*0.28);
+
+  // Swap ctx to preview canvas, draw car, restore
+  const mainCtx=ctx;
+  ctx=pctx;
+  const sc=Math.min(pw,ph)*0.38;
+  const cx=pw/2, cy=ph-4;
+  const def=CARS[selCar];
+  const fns={'s105':drawCar105,'s120':drawCar120,'rapid':drawCarRapid,
+    'garde':drawCarGarde,'favorit':drawCarFavorit,'forman':drawCarForman,
+    'felicia':drawCarFelicia,'s110r':drawCar110R,'s130rs':drawCar130RS};
+  (fns[def.id]||drawCar105)(cx,cy,sc,def);
+  ctx=mainCtx;
+
+  // Car name label
+  const lbl=document.getElementById('cprev-lbl');
+  if(lbl) lbl.textContent=CARS[selCar].n.toUpperCase()+' '+CARS[selCar].y;
+}
+
+// ═══════════ MENU ═══════════
+function renderMenu(){
+  CARS.forEach(c=>{c._lk=wins<c.ulk;});
+  TRACKS[1]._lk=wins<TRACKS[1].lk;TRACKS[2]._lk=wins<TRACKS[2].lk;
+  if(CARS[selCar]._lk){for(let i=0;i<CARS.length;i++)if(!CARS[i]._lk){selCar=i;break;}}
+  const cg=document.getElementById('cgrid');cg.innerHTML='';
+  CARS.forEach((c,i)=>{
+    const d=document.createElement('div');
+    d.className='car-card'+(c._lk?' locked':'')+(i===selCar&&!c._lk?' selected':'');
+    d.innerHTML=`<div class="cicon">${c.ico}</div><div class="cname">${c.n.replace('Škoda ','')}</div><div class="cyear">${c.y}</div>
+    <div class="sbar"><div class="sfill" style="width:${(c.spd/240*100).toFixed(0)}%;background:linear-gradient(90deg,#cc3300,#ffdd00)"></div></div>
+    <div class="sbar"><div class="sfill" style="width:${(c.hd*100).toFixed(0)}%;background:linear-gradient(90deg,#0044cc,#44aaff)"></div></div>
+    ${c.ulk>0&&c._lk?`<div class="cunlk">${c.ulk} výher</div>`:''}`;
+    if(!c._lk) d.onclick=()=>{selCar=i;renderMenu();};
+    cg.appendChild(d);
+  });
+  const tr=document.getElementById('trow');tr.innerHTML='';
+  TRACKS.forEach((t,i)=>{
+    const d=document.createElement('div');
+    d.className='track-card'+(t._lk?' locked':'')+(i===selTrack&&!t._lk?' selected':'');
+    const bt=bests[t.id]?`<div class="tbest">BEST: ${fmtT(bests[t.id])}</div>`:'';
+    d.innerHTML=`<div class="ticon">${t.ico}</div><div class="tname">${t.n}</div><div class="tdesc">${t.desc}</div>${bt}`;
+    if(!t._lk) d.onclick=()=>{selTrack=i;renderMenu();};
+    tr.appendChild(d);
+  });
+  document.getElementById('wbadge').innerHTML=`VÝHRY: ${wins}<br>AUTA: ${CARS.filter(c=>!c._lk).length}/${CARS.length}`;
+  renderCarPreview();
+}
+renderMenu();
+document.getElementById('bstart').onclick=startGame;
+
+// ═══════════ COUNTDOWN ═══════════
+function toggleCam(){
+  camMode = camMode==='chase' ? 'cockpit' : 'chase';
+  const btn=document.getElementById('camtoggle');
+  btn.textContent = camMode==='cockpit' ? '🚗 ZA AUTEM [C]' : '📷 KOKPIT [C]';
+}
+document.getElementById('camtoggle').onclick=()=>{ if(gstate==='racing') toggleCam(); };
+
+function doCountdown(cb){
+  const el=document.getElementById('countdown');let v=3;
+  function step(){
+    el.style.display='block';el.textContent=v;el.style.color='#fff';
+    el.style.animation='none';void el.offsetWidth;el.style.animation='cpop 0.5s ease-out';
+    if(v>0){v--;setTimeout(step,850);}
+    else{el.textContent='GO!';el.style.color='#00ff88';setTimeout(()=>{el.style.display='none';cb();},700);}
+  }
+  step();
+}
+
+// ═══════════ START / RESULTS ═══════════
+function startGame(){
+  const c=CARS[selCar],t=TRACKS[selTrack];
+  if(c._lk||t._lk){alert('Toto auto nebo trať není odemčená!');return;}
+  buildTrack(t.id);totalLaps=t.laps;initCar();
+  lapNo=1;lapTimes=[];done=false;camMode='chase';
+  document.getElementById('camtoggle').textContent='📷 KOKPIT [C]';
+  document.getElementById('lv').textContent=`1/${totalLaps}`;
+  document.getElementById('hcar').textContent=c.n.toUpperCase();
+  document.getElementById('menu-screen').style.display='none';
+  document.getElementById('result-screen').style.display='none';
+  document.getElementById('hud').style.display='block';
+  const mob=/Mobi|Android/i.test(navigator.userAgent)||W<620;
+  document.getElementById('mctrl').style.display=mob?'block':'none';
+  gstate='countdown';
+  doCountdown(()=>{gstate='racing';lapStart=Date.now();});
+}
+function showResults(total){
+  gstate='finished';
+  document.getElementById('hud').style.display='none';
+  document.getElementById('result-screen').style.display='flex';
+  const tid=TRACKS[selTrack].id,isRec=!bests[tid]||total<bests[tid];
+  if(isRec) bests[tid]=total;
+  wins++;persist();
+
+  // Zjisti odemčená PŘED renderMenu (renderMenu přepíše _lk)
+  const oldLk=CARS.map(c=>wins-1<c.ulk); // stav před výhrou
+  const news=[];
+  CARS.forEach((c,i)=>{if(oldLk[i]&&wins>=c.ulk) news.push(c.n);});
+  if(wins-1<TRACKS[1].lk&&wins>=TRACKS[1].lk) news.push('Trať: Šumavská Rally');
+  if(wins-1<TRACKS[2].lk&&wins>=TRACKS[2].lk) news.push('Trať: Grand Prix Okruh');
+
+  document.getElementById('rt').textContent=isRec?'🏆 REKORD!':'🏁 CÍLEM!';
+  document.getElementById('rtm').textContent=fmtT(total);
+  document.getElementById('rb').textContent=isRec?'Nejlepší čas tratě!':`Nejlepší: ${fmtT(bests[tid])}`;
+  const ru=document.getElementById('ru');
+  if(news.length){ru.style.display='block';ru.innerHTML='🔓 ODEMČENO:<br>'+news.join('<br>');}
+  else ru.style.display='none';
+  renderMenu();
+}
+document.getElementById('bagain').onclick=()=>{document.getElementById('ru').style.display='none';startGame();};
+document.getElementById('bmenu').onclick=()=>{
+  document.getElementById('result-screen').style.display='none';
+  document.getElementById('menu-screen').style.display='flex';renderMenu();
+};
+
+// ═══════════ MAIN LOOP ═══════════
+let last=0;
+function loop(ts){
+  requestAnimationFrame(loop);
+  const dt=Math.min((ts-last)/1000,0.05);last=ts;
+  if(gstate==='racing'||gstate==='countdown'){
+    ctx.clearRect(0,0,W,H);renderScene();
+    if(gstate==='racing') update(dt);
+  }
+}
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

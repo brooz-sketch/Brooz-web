@@ -1,0 +1,1006 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="Reality"/>
+<meta name="theme-color" content="#0a0a0f"/>
+<title>Reality — Správa nemovitostí</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,400&family=Syne:wght@400;600;700;800&display=swap');
+
+:root {
+  --bg: #0a0a0f;
+  --bg2: #111118;
+  --card: #12121c;
+  --border: #1c1c2e;
+  --border2: #28283c;
+  --text: #e0e0f0;
+  --text2: #9090a8;
+  --text3: #444455;
+  --indigo: #4f46e5;
+  --indigo-light: #818cf8;
+  --green: #16a34a;
+  --green-light: #4ade80;
+  --green-bg: #052e16;
+  --green-border: #166534;
+  --red: #dc2626;
+  --red-light: #f87171;
+  --red-bg: #1c0a0a;
+  --red-border: #7f1d1d;
+  --amber: #fbbf24;
+  --teal: #34d399;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; background: var(--bg); color: var(--text); font-family: 'DM Mono', 'Courier New', monospace; overscroll-behavior: none; }
+body { display: flex; justify-content: center; }
+
+#app { width: 100%; max-width: 480px; min-height: 100vh; display: flex; flex-direction: column; position: relative; background: var(--bg); }
+
+/* ── Scrollbars ── */
+::-webkit-scrollbar { width: 3px; }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+/* ── Cards ── */
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 18px; }
+
+/* ── Badges ── */
+.badge { display: inline-block; padding: 4px 11px; border-radius: 20px; font-size: 10px; font-weight: 700; letter-spacing: .04em; }
+
+/* ── Inputs ── */
+.input { background: #181826; border: 1px solid var(--border2); border-radius: 12px; padding: 13px 15px; color: var(--text); font-family: inherit; font-size: 15px; width: 100%; line-height: 1.4; }
+.input:focus { outline: none; border-color: var(--indigo); background: #1c1c2e; }
+select.input { appearance: none; }
+textarea.input { resize: none; }
+
+/* ── Buttons ── */
+.btn { border: none; border-radius: 12px; padding: 13px 20px; cursor: pointer; font-family: inherit; font-weight: 700; transition: all .15s; letter-spacing: .02em; font-size: 14px; }
+.btn:active { transform: scale(.97); opacity: .85; }
+.btn-primary { background: linear-gradient(135deg, #4f46e5, #6d28d9); color: white; width: 100%; font-size: 15px; }
+.btn-sm { font-size: 12px; padding: 9px 14px; border-radius: 10px; }
+.btn-ghost { background: transparent; border: 1px solid var(--border2); color: #888; }
+.btn-danger { background: #1a0606; border: 1px solid #7f1d1d44; color: var(--red-light); }
+.btn-green { background: linear-gradient(135deg, var(--green-bg), #064e3b); border: 1px solid var(--green-border); color: var(--green-light); width: 100%; padding: 14px; font-size: 14px; font-weight: 700; }
+
+/* ── Tab pills ── */
+.tab-pill { background: none; border: 1px solid var(--border2); padding: 8px 16px; cursor: pointer; font-family: inherit; font-size: 12px; color: #444; border-radius: 20px; white-space: nowrap; transition: all .15s; font-weight: 600; }
+.tab-pill.active { background: #1e1b4b; border-color: var(--indigo); color: #a5b4fc; }
+
+/* ── Layout ── */
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.scroll-x { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; }
+.scroll-x::-webkit-scrollbar { display: none; }
+.data-row { display: flex; justify-content: space-between; align-items: center; padding: 11px 0; border-bottom: 1px solid #0e0e1a; }
+.data-row:last-child { border-bottom: none; }
+.gap10 { display: flex; flex-direction: column; gap: 10px; }
+.gap12 { display: flex; flex-direction: column; gap: 12px; }
+
+/* ── Typography ── */
+.h-xl  { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 32px; line-height: 1.1; letter-spacing: -.02em; }
+.h-lg  { font-family: 'Syne', sans-serif; font-weight: 800; font-size: 22px; line-height: 1.2; letter-spacing: -.01em; }
+.h-md  { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 17px; letter-spacing: -.005em; }
+.h-sm  { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 14px; }
+.sec   { font-family: 'Syne', sans-serif; font-size: 10px; color: var(--indigo); text-transform: uppercase; letter-spacing: .14em; font-weight: 700; margin-bottom: 12px; }
+.cap   { font-size: 10px; color: var(--text3); letter-spacing: .04em; }
+.num   { font-variant-numeric: tabular-nums; }
+
+/* ── CF chips ── */
+.cf-pos { background: var(--green-bg); border: 1px solid var(--green-border); color: var(--green-light); border-radius: 10px; padding: 5px 11px; font-weight: 800; font-size: 13px; white-space: nowrap; }
+.cf-neg { background: var(--red-bg); border: 1px solid var(--red-border); color: var(--red-light); border-radius: 10px; padding: 5px 11px; font-weight: 800; font-size: 13px; white-space: nowrap; }
+
+/* ── Label ── */
+.field-label { font-size: 11px; color: #444; display: block; margin-bottom: 6px; text-transform: uppercase; letter-spacing: .06em; font-weight: 600; }
+.field-wrap { margin-bottom: 13px; }
+
+/* ── Screens ── */
+.screen { display: none; flex: 1; overflow-y: auto; padding-bottom: 82px; }
+.screen.active { display: block; }
+
+/* ── Bottom nav ── */
+#bottom-nav {
+  position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
+  width: 100%; max-width: 480px;
+  background: #090910; border-top: 1px solid #16162a;
+  display: flex; justify-content: space-around; align-items: center;
+  padding: 10px 0; padding-bottom: max(10px, var(--safe-bottom));
+  z-index: 50;
+}
+.nav-btn { background: none; border: none; cursor: pointer; font-family: inherit; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 22px; border-radius: 14px; transition: all .15s; }
+.nav-btn.active { background: #14142a; }
+.nav-icon { font-size: 22px; }
+.nav-label { font-size: 9px; text-transform: uppercase; letter-spacing: .08em; color: #333; font-weight: 600; }
+.nav-btn.active .nav-label { color: var(--indigo-light); }
+
+/* ── Modal ── */
+.modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.88); z-index: 200; flex-direction: column; }
+.modal-overlay.open { display: flex; }
+.modal-inner { background: #0e0e18; border-top: 1px solid var(--border2); border-radius: 22px 22px 0 0; margin-top: auto; max-height: 88vh; display: flex; flex-direction: column; }
+.contract-pre { font-family: 'DM Mono', monospace; font-size: 12px; line-height: 1.9; color: #9090b8; white-space: pre-wrap; overflow-y: auto; flex: 1; padding: 16px 18px; }
+
+/* ── Toast ── */
+#toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: #1e1b4b; border: 1px solid var(--indigo); color: #a5b4fc; padding: 10px 20px; border-radius: 20px; font-size: 13px; font-weight: 600; z-index: 300; opacity: 0; transition: opacity .3s; pointer-events: none; }
+#toast.show { opacity: 1; }
+
+/* ── Confirm dialog ── */
+.confirm-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.8); z-index: 250; align-items: center; justify-content: center; padding: 20px; }
+.confirm-overlay.open { display: flex; }
+.confirm-box { background: var(--card); border: 1px solid var(--border2); border-radius: 18px; padding: 24px; width: 100%; max-width: 320px; text-align: center; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ══ SCREEN: DASHBOARD ══ -->
+  <div class="screen active" id="screen-dashboard">
+    <div style="padding:16px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:22px;padding-top:10px">
+        <div>
+          <div class="h-lg">🏠 Reality</div>
+          <div class="cap" style="margin-top:3px;letter-spacing:.12em">SPRÁVA NEMOVITOSTÍ</div>
+        </div>
+        <div id="dash-count" class="card" style="padding:7px 14px;border-radius:20px">
+          <span style="font-size:11px;color:#555">0 bytů</span>
+        </div>
+      </div>
+
+      <!-- Hero CF -->
+      <div id="dash-hero" style="border-radius:22px;padding:22px;margin-bottom:14px;border:1.5px solid #166534;background:linear-gradient(145deg,#052e16,#121220)">
+        <div class="sec" style="color:#4ade8088;margin-bottom:8px">ČISTÝ CASH FLOW / MĚSÍC</div>
+        <div id="dash-cf" class="h-xl num" style="color:#4ade80">+0 Kč</div>
+        <div style="display:flex;gap:10px;margin-top:16px">
+          <div style="background:#052e1644;border-radius:12px;padding:9px 14px;flex:1">
+            <div class="cap">PŘÍJMY</div>
+            <div id="dash-income" class="h-sm num" style="color:#4ade80;margin-top:3px">0 Kč</div>
+          </div>
+          <div style="background:#1c0a0a44;border-radius:12px;padding:9px 14px;flex:1">
+            <div class="cap">VÝDAJE</div>
+            <div id="dash-expenses" class="h-sm num" style="color:#f87171;margin-top:3px">0 Kč</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- KPI 2×2 -->
+      <div class="row2" style="margin-bottom:14px" id="dash-kpi">
+        <div class="card" style="padding:14px"><div class="cap" style="margin-bottom:6px">Hodnota portfolia</div><div id="kpi-value" class="h-sm num" style="color:#818cf8;font-size:13px">0 Kč</div><div id="kpi-value-sub" class="cap" style="margin-top:4px">—</div></div>
+        <div class="card" style="padding:14px"><div class="cap" style="margin-bottom:6px">Vlastní kapitál</div><div id="kpi-equity" class="h-sm num" style="color:#6366f1;font-size:13px">0 Kč</div><div class="cap" style="margin-top:4px">po hyp.</div></div>
+        <div class="card" style="padding:14px"><div class="cap" style="margin-bottom:6px">Roční příjmy</div><div id="kpi-annual" class="h-sm num" style="color:#34d399;font-size:13px">0 Kč</div><div class="cap" style="margin-top:4px">hrubě</div></div>
+        <div class="card" style="padding:14px"><div class="cap" style="margin-bottom:6px">Celkem hypotéky</div><div id="kpi-mortgage" class="h-sm num" style="color:#f87171;font-size:13px">0 Kč</div><div class="cap" style="margin-top:4px">dluh</div></div>
+      </div>
+
+      <!-- Bar chart -->
+      <div class="card" style="margin-bottom:14px">
+        <div class="sec">CASH FLOW — MĚSÍČNĚ</div>
+        <div id="dash-chart" style="display:flex;align-items:flex-end;gap:3px;height:64px"></div>
+      </div>
+
+      <!-- Quick list -->
+      <div class="card">
+        <div class="sec">NEMOVITOSTI</div>
+        <div id="dash-list"></div>
+        <div id="dash-empty" style="text-align:center;padding:20px;color:#444;font-size:13px;display:none">
+          Zatím žádné nemovitosti.<br>Přidej první kliknutím na + Přidat.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ SCREEN: LIST ══ -->
+  <div class="screen" id="screen-list">
+    <div style="padding:16px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;padding-top:10px">
+        <div class="h-lg">Moje byty</div>
+        <button class="btn btn-primary btn-sm" style="width:auto" onclick="showAdd()">+ Přidat</button>
+      </div>
+      <div id="list-cards" class="gap12"></div>
+      <div id="list-empty" style="text-align:center;padding:40px 20px;color:#444;font-size:14px;display:none">
+        <div style="font-size:40px;margin-bottom:12px">🏠</div>
+        Žádné nemovitosti.<br>Klikni na + Přidat.
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ SCREEN: DETAIL ══ -->
+  <div class="screen" id="screen-detail">
+    <div>
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px 0">
+        <button class="btn btn-ghost btn-sm" onclick="goNav('list')" style="display:flex;align-items:center;gap:5px;color:#6366f1;border:none;background:none;font-weight:700">← Zpět</button>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-ghost btn-sm" onclick="showEdit()" id="btn-edit">✏️ Upravit</button>
+          <button class="btn btn-danger btn-sm" onclick="confirmDelete()" id="btn-delete">🗑</button>
+        </div>
+      </div>
+      <div style="padding:12px 16px 0">
+        <div class="h-lg" id="detail-name" style="color:#eeeeff"></div>
+        <div id="detail-sub" style="font-size:11px;color:#3a3a52;margin-top:4px"></div>
+        <span id="detail-badge" class="badge" style="margin-top:10px;display:inline-block"></span>
+      </div>
+      <!-- CF strip -->
+      <div id="detail-cf-strip" style="margin:14px 16px;border-radius:18px;padding:16px 20px;display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div class="cap" id="detail-cf-cap"></div>
+          <div class="h-xl num" id="detail-cf-val" style="margin-top:4px;font-size:28px"></div>
+        </div>
+        <div style="text-align:right">
+          <div class="cap">ROČNĚ</div>
+          <div class="h-md num" id="detail-cf-annual" style="margin-top:4px;opacity:.7"></div>
+        </div>
+      </div>
+      <!-- Tab pills -->
+      <div class="scroll-x" style="padding:0 16px 14px">
+        <button class="tab-pill active" onclick="switchDetailTab('prehled',this)">přehled</button>
+        <button class="tab-pill" onclick="switchDetailTab('finance',this)">finance</button>
+        <button class="tab-pill" onclick="switchDetailTab('smlouva',this)">smlouva</button>
+        <button class="tab-pill" onclick="switchDetailTab('hypoteka',this)">hypotéka</button>
+        <button class="tab-pill" onclick="switchDetailTab('poznamky',this)">poznámky</button>
+      </div>
+      <div style="padding:0 16px 24px">
+        <div id="tab-prehled"></div>
+        <div id="tab-finance" style="display:none"></div>
+        <div id="tab-smlouva" style="display:none"></div>
+        <div id="tab-hypoteka" style="display:none"></div>
+        <div id="tab-poznamky" style="display:none"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ SCREEN: ADD/EDIT FORM ══ -->
+  <div class="screen" id="screen-form">
+    <div style="padding:16px">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;padding-top:10px">
+        <button class="btn btn-ghost btn-sm" id="form-back-btn" onclick="formBack()" style="border:none;background:none;color:#6366f1;font-weight:700">← Zpět</button>
+        <div class="h-md" id="form-title">Přidat byt</div>
+      </div>
+      <form id="property-form" onsubmit="return false">
+
+        <div class="sec" style="margin-top:4px">ZÁKLADNÍ INFO</div>
+        <div class="field-wrap"><label class="field-label">Název</label><input class="input" id="f-name" placeholder="Byt 2+1 — Praha" required/></div>
+        <div class="field-wrap"><label class="field-label">Adresa</label><input class="input" id="f-address" placeholder="Ulice 1, Praha 2"/></div>
+        <div class="row2" style="margin-bottom:13px">
+          <div class="field-wrap" style="margin-bottom:0"><label class="field-label">Typ</label>
+            <select class="input" id="f-type">
+              <option>1+kk</option><option>1+1</option><option>2+kk</option><option selected>2+1</option>
+              <option>3+kk</option><option>3+1</option><option>4+kk</option><option>4+1</option>
+            </select>
+          </div>
+          <div class="field-wrap" style="margin-bottom:0"><label class="field-label">Plocha (m²)</label><input class="input" id="f-area" type="number" value="60"/></div>
+        </div>
+        <div class="row2" style="margin-bottom:13px">
+          <div class="field-wrap" style="margin-bottom:0"><label class="field-label">Kupní cena</label><input class="input" id="f-purchase-price" type="number" value="0"/></div>
+          <div class="field-wrap" style="margin-bottom:0"><label class="field-label">Aktuální cena</label><input class="input" id="f-current-price" type="number" value="0"/></div>
+        </div>
+        <div class="field-wrap"><label class="field-label">Datum koupě</label><input class="input" id="f-purchase-date" type="date"/></div>
+
+        <div class="sec" style="margin-top:20px">STAV</div>
+        <div class="field-wrap">
+          <label class="field-label">Stav nemovitosti</label>
+          <div style="display:flex;gap:8px">
+            <button type="button" class="tab-pill active" onclick="setStatus('pronajato',this)">pronajato</button>
+            <button type="button" class="tab-pill" onclick="setStatus('volný',this)">volný</button>
+            <button type="button" class="tab-pill" onclick="setStatus('rekonstrukce',this)">rekonstrukce</button>
+          </div>
+          <input type="hidden" id="f-status" value="pronajato"/>
+        </div>
+
+        <div class="sec" style="margin-top:20px">PŘÍJMY</div>
+        <div class="row2">
+          <div class="field-wrap"><label class="field-label">Nájemné/měs</label><input class="input" id="f-rent" type="number" value="0"/></div>
+          <div class="field-wrap"><label class="field-label">Ostatní/měs</label><input class="input" id="f-other-income" type="number" value="0"/></div>
+        </div>
+
+        <div class="sec" style="margin-top:20px">VÝDAJE</div>
+        <div class="row2">
+          <div class="field-wrap"><label class="field-label">Energie</label><input class="input" id="f-utilities" type="number" value="0"/></div>
+          <div class="field-wrap"><label class="field-label">Pojištění</label><input class="input" id="f-insurance" type="number" value="0"/></div>
+        </div>
+        <div class="row2">
+          <div class="field-wrap"><label class="field-label">Údržba</label><input class="input" id="f-maintenance" type="number" value="0"/></div>
+          <div class="field-wrap"><label class="field-label">Daň</label><input class="input" id="f-tax" type="number" value="0"/></div>
+        </div>
+        <div class="field-wrap"><label class="field-label">Správa</label><input class="input" id="f-management" type="number" value="0"/></div>
+
+        <div class="sec" style="margin-top:20px">HYPOTÉKA</div>
+        <div class="row2">
+          <div class="field-wrap"><label class="field-label">Splátka/měs</label><input class="input" id="f-mort-monthly" type="number" value="0"/></div>
+          <div class="field-wrap"><label class="field-label">Zbývající dluh</label><input class="input" id="f-mort-remaining" type="number" value="0"/></div>
+        </div>
+        <div class="row2">
+          <div class="field-wrap"><label class="field-label">Úrok %</label><input class="input" id="f-mort-rate" type="number" step="0.01" value="0"/></div>
+          <div class="field-wrap"><label class="field-label">Splatnost do</label><input class="input" id="f-mort-end" type="date"/></div>
+        </div>
+
+        <div class="sec" style="margin-top:20px">NÁJEMNÍK</div>
+        <div class="field-wrap"><label class="field-label">Jméno nájemníka</label><input class="input" id="f-tenant-name" value="Volný"/></div>
+        <div class="row2">
+          <div class="field-wrap"><label class="field-label">Smlouva od</label><input class="input" id="f-tenant-since" type="date"/></div>
+          <div class="field-wrap"><label class="field-label">Smlouva do</label><input class="input" id="f-tenant-end" type="date"/></div>
+        </div>
+        <div class="field-wrap"><label class="field-label">Kauce</label><input class="input" id="f-deposit" type="number" value="0"/></div>
+
+        <div class="sec" style="margin-top:20px">POZNÁMKY</div>
+        <div class="field-wrap" style="margin-bottom:22px">
+          <textarea class="input" id="f-notes" rows="3" placeholder="Volný text..."></textarea>
+        </div>
+
+        <button type="button" class="btn btn-primary" id="form-save-btn" onclick="saveProperty()">➕ Přidat nemovitost</button>
+        <div style="height:16px"></div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ══ BOTTOM NAV ══ -->
+  <div id="bottom-nav">
+    <button class="nav-btn active" id="nav-dashboard" onclick="goNav('dashboard')">
+      <span class="nav-icon">📊</span>
+      <span class="nav-label">Přehled</span>
+    </button>
+    <button class="nav-btn" id="nav-list" onclick="goNav('list')">
+      <span class="nav-icon">🏠</span>
+      <span class="nav-label">Byty</span>
+    </button>
+    <button class="nav-btn" id="nav-add" onclick="showAdd()">
+      <span class="nav-icon">＋</span>
+      <span class="nav-label">Přidat</span>
+    </button>
+  </div>
+
+</div>
+
+<!-- ══ CONTRACT MODAL ══ -->
+<div class="modal-overlay" id="contract-modal">
+  <div class="modal-inner">
+    <div style="padding:18px 18px 12px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #1c1c2e">
+      <div>
+        <div class="h-sm">📄 Dodatek ke smlouvě</div>
+        <div class="cap" style="margin-top:4px" id="contract-subtitle"></div>
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="closeContract()">✕</button>
+    </div>
+    <pre class="contract-pre" id="contract-text"></pre>
+    <div style="padding:12px 16px 16px;border-top:1px solid #1c1c2e">
+      <button class="btn btn-green" onclick="copyContract()">📋 Kopírovat text dodatku</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ CONFIRM DIALOG ══ -->
+<div class="confirm-overlay" id="confirm-overlay">
+  <div class="confirm-box">
+    <div style="font-size:32px;margin-bottom:12px">🗑</div>
+    <div class="h-sm" style="margin-bottom:8px">Smazat nemovitost?</div>
+    <div style="font-size:13px;color:#666;margin-bottom:20px">Tuto akci nelze vzít zpět.</div>
+    <div style="display:flex;gap:10px">
+      <button class="btn btn-danger" style="flex:1" onclick="doDelete()">Smazat</button>
+      <button class="btn btn-ghost" style="flex:1" onclick="closeConfirm()">Zrušit</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ TOAST ══ -->
+<div id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════════
+// DATA LAYER — localStorage
+// ═══════════════════════════════════════════════════
+const STORAGE_KEY = 'reality_properties_v1';
+
+const DEMO_DATA = [
+  { id:1, name:"Byt 2+1 — Vinohrady", address:"Mánesova 12, Praha 2", type:"2+1", area:68,
+    purchasePrice:4200000, currentPrice:5800000, purchaseDate:"2019-03-15",
+    mortgage:{ monthly:18500, remaining:2850000, rate:2.89, endDate:"2049-03-15" },
+    tenant:{ name:"Jan Novák", since:"2020-06-01", contractEnd:"2026-05-31", deposit:42000 },
+    income:{ rent:22000, other:0 },
+    expenses:{ utilities:2200, insurance:800, maintenance:600, tax:1200, management:0 },
+    notes:"Nová kuchyň v roce 2022. Velmi spolehlivý nájemník.", status:"pronajato" },
+  { id:2, name:"Byt 1+kk — Žižkov", address:"Seifertova 45, Praha 3", type:"1+kk", area:32,
+    purchasePrice:2800000, currentPrice:3650000, purchaseDate:"2021-11-08",
+    mortgage:{ monthly:14200, remaining:2350000, rate:3.49, endDate:"2051-11-08" },
+    tenant:{ name:"Petra Svobodová", since:"2022-02-01", contractEnd:"2025-01-31", deposit:28000 },
+    income:{ rent:16500, other:500 },
+    expenses:{ utilities:1400, insurance:500, maintenance:300, tax:700, management:1650 },
+    notes:"Správa přes agenturu. Smlouva k obnově v lednu 2026.", status:"pronajato" },
+  { id:3, name:"Byt 3+1 — Dejvice", address:"Antonína Čermáka 8, Praha 6", type:"3+1", area:92,
+    purchasePrice:7500000, currentPrice:9200000, purchaseDate:"2017-06-20",
+    mortgage:{ monthly:28000, remaining:3100000, rate:1.99, endDate:"2047-06-20" },
+    tenant:{ name:"Volný", since:"", contractEnd:"", deposit:0 },
+    income:{ rent:0, other:0 },
+    expenses:{ utilities:3200, insurance:1200, maintenance:1500, tax:1800, management:0 },
+    notes:"Momentálně volný. Rekonstrukce koupelny plánována na Q1 2026.", status:"volný" },
+  { id:4, name:"Byt 2+kk — Holešovice", address:"Dělnická 22, Praha 7", type:"2+kk", area:55,
+    purchasePrice:3600000, currentPrice:4900000, purchaseDate:"2020-09-01",
+    mortgage:{ monthly:16800, remaining:2900000, rate:2.59, endDate:"2050-09-01" },
+    tenant:{ name:"Tomáš Král", since:"2021-01-01", contractEnd:"2026-12-31", deposit:35000 },
+    income:{ rent:19500, other:0 },
+    expenses:{ utilities:1800, insurance:650, maintenance:400, tax:900, management:0 },
+    notes:"Dlouhodobý nájemník, platí pravidelně. Možnost prodeje v 2027.", status:"pronajato" }
+];
+
+function loadProperties() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch(e) {}
+  // First run — load demo data
+  saveProperties(DEMO_DATA);
+  return DEMO_DATA;
+}
+
+function saveProperties(props) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(props));
+}
+
+let properties = loadProperties();
+let currentDetailId = null;
+let currentDetailTab = 'prehled';
+let isEditMode = false;
+let editingId = null;
+
+// ═══════════════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════════════
+const fmt = n => new Intl.NumberFormat('cs-CZ',{style:'currency',currency:'CZK',maximumFractionDigits:0}).format(n);
+const pct = (a,b) => (((b-a)/a)*100).toFixed(1);
+const statusColor = { pronajato:'#22c55e', 'volný':'#f59e0b', rekonstrukce:'#3b82f6' };
+const statusEmoji = { pronajato:'🟢', 'volný':'🟡', rekonstrukce:'🔵' };
+
+function cfColor(v)  { return v >= 0 ? '#4ade80' : '#f87171'; }
+function cfBg(v)     { return v >= 0 ? '#052e16' : '#1c0a0a'; }
+function cfBorder(v) { return v >= 0 ? '#166534' : '#7f1d1d'; }
+
+function propCF(p) {
+  return p.income.rent + p.income.other
+       - Object.values(p.expenses).reduce((a,b)=>a+b,0)
+       - p.mortgage.monthly;
+}
+
+function totals() {
+  return {
+    purchase: properties.reduce((s,p)=>s+p.purchasePrice,0),
+    current:  properties.reduce((s,p)=>s+p.currentPrice,0),
+    rent:     properties.reduce((s,p)=>s+p.income.rent+p.income.other,0),
+    expenses: properties.reduce((s,p)=>s+Object.values(p.expenses).reduce((a,b)=>a+b,0)+p.mortgage.monthly,0),
+    mortgage: properties.reduce((s,p)=>s+p.mortgage.remaining,0),
+  };
+}
+
+function fmtDateCZ(ds) {
+  if (!ds) return '—';
+  const mths=['ledna','února','března','dubna','května','června','července','srpna','září','října','listopadu','prosince'];
+  const d = new Date(ds); if(isNaN(d)) return ds;
+  return `${d.getDate()}. ${mths[d.getMonth()]} ${d.getFullYear()}`;
+}
+function nextDay(ds) { const d=new Date(ds); d.setDate(d.getDate()+1); return d.toISOString().split('T')[0]; }
+function addOneYear(ds) { const d=new Date(ds); d.setFullYear(d.getFullYear()+1); return d.toISOString().split('T')[0]; }
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), 2500);
+}
+
+// ═══════════════════════════════════════════════════
+// NAVIGATION
+// ═══════════════════════════════════════════════════
+function goNav(tab) {
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('screen-'+tab).classList.add('active');
+  const navBtn = document.getElementById('nav-'+tab);
+  if (navBtn) navBtn.classList.add('active');
+
+  if (tab === 'dashboard') renderDashboard();
+  if (tab === 'list')      renderList();
+  if (tab === 'detail')    renderDetail();
+}
+
+function showAdd() {
+  isEditMode = false; editingId = null;
+  document.getElementById('form-title').textContent = 'Přidat byt';
+  document.getElementById('form-save-btn').textContent = '➕ Přidat nemovitost';
+  resetForm();
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById('screen-form').classList.add('active');
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('nav-add').classList.add('active');
+}
+
+function showEdit() {
+  const p = properties.find(x=>x.id===currentDetailId); if(!p) return;
+  isEditMode = true; editingId = p.id;
+  document.getElementById('form-title').textContent = 'Upravit byt';
+  document.getElementById('form-save-btn').textContent = '✅ Uložit změny';
+  fillForm(p);
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById('screen-form').classList.add('active');
+}
+
+function formBack() {
+  if (isEditMode) { goNav('detail'); }
+  else { goNav('list'); }
+}
+
+function openDetail(id) {
+  currentDetailId = id;
+  currentDetailTab = 'prehled';
+  goNav('detail');
+}
+
+// ═══════════════════════════════════════════════════
+// RENDER DASHBOARD
+// ═══════════════════════════════════════════════════
+function renderDashboard() {
+  const t = totals();
+  const cf = t.rent - t.expenses;
+
+  // Count
+  document.getElementById('dash-count').innerHTML = `<span style="font-size:11px;color:#555">${properties.length} bytů</span>`;
+
+  // Hero CF
+  const hero = document.getElementById('dash-hero');
+  hero.style.background = `linear-gradient(145deg,${cfBg(cf)},#121220)`;
+  hero.style.borderColor = cfBorder(cf);
+  document.getElementById('dash-cf').style.color = cfColor(cf);
+  document.getElementById('dash-cf').textContent = (cf>=0?'+':'')+fmt(cf);
+  document.getElementById('dash-income').textContent = fmt(t.rent);
+  document.getElementById('dash-expenses').textContent = fmt(t.expenses);
+
+  // KPIs
+  document.getElementById('kpi-value').textContent = fmt(t.current);
+  document.getElementById('kpi-value-sub').textContent = t.purchase > 0 ? `↑ ${pct(t.purchase,t.current)}% od koupě` : '—';
+  document.getElementById('kpi-equity').textContent = fmt(t.current - t.mortgage);
+  document.getElementById('kpi-annual').textContent = fmt(t.rent*12);
+  document.getElementById('kpi-mortgage').textContent = fmt(t.mortgage);
+
+  // Bar chart
+  const months = ['Led','Úno','Bře','Dub','Kvě','Čer','Čvc','Srp','Zář','Říj','Lis','Pro'];
+  const cfData = months.map((_,i)=>({ month:months[i], net:cf+(i%3===0?-2000:i%4===0?3000:0) }));
+  const maxCF = Math.max(...cfData.map(d=>Math.abs(d.net)),1);
+  const chart = document.getElementById('dash-chart');
+  chart.innerHTML = cfData.map(d=>`
+    <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px">
+      <div style="width:100%;background:${d.net>=0?'#16a34a':'#dc2626'};border-radius:3px 3px 0 0;height:${Math.abs(d.net)/maxCF*58}px;min-height:2px"></div>
+      <div style="font-size:7px;color:#333">${d.month}</div>
+    </div>`).join('');
+
+  // Quick list
+  const list = document.getElementById('dash-list');
+  const empty = document.getElementById('dash-empty');
+  if (properties.length === 0) { list.innerHTML=''; empty.style.display='block'; return; }
+  empty.style.display='none';
+  list.innerHTML = properties.map(p => {
+    const cf2 = propCF(p);
+    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-bottom:1px solid #0e0e1a;cursor:pointer" onclick="openDetail(${p.id})">
+      <div style="flex:1;margin-right:10px">
+        <div style="font-size:13px;font-weight:600;color:#d0d0e8">${p.name}</div>
+        <div style="font-size:11px;color:#3a3a52;margin-top:2px">${statusEmoji[p.status]||'⚪'} ${p.status} · ${fmt(p.income.rent)}/měs</div>
+      </div>
+      <span class="${cf2>=0?'cf-pos':'cf-neg'}">${cf2>=0?'+':''}${fmt(cf2)}</span>
+    </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════
+// RENDER LIST
+// ═══════════════════════════════════════════════════
+function renderList() {
+  const container = document.getElementById('list-cards');
+  const empty = document.getElementById('list-empty');
+  if (properties.length === 0) { container.innerHTML=''; empty.style.display='block'; return; }
+  empty.style.display = 'none';
+  container.innerHTML = properties.map(p => {
+    const cf = propCF(p);
+    const ltv = p.currentPrice>0 ? (p.mortgage.remaining/p.currentPrice*100).toFixed(0) : 0;
+    return `<div class="card" style="cursor:pointer" onclick="openDetail(${p.id})">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
+        <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:17px;color:#d8d8f0;flex:1;margin-right:10px">${p.name}</div>
+        <span class="badge" style="background:${statusColor[p.status]||'#666'}22;color:${statusColor[p.status]||'#666'}">${p.status}</span>
+      </div>
+      <div style="font-size:11px;color:#3a3a52;margin-bottom:14px">${p.address}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+        <div><div class="cap" style="margin-bottom:4px">Nájemné</div><div style="font-size:13px;color:#818cf8;font-weight:700;font-variant-numeric:tabular-nums">${fmt(p.income.rent)}</div></div>
+        <div><div class="cap" style="margin-bottom:4px">Cash flow</div><div style="font-size:13px;color:${cfColor(cf)};font-weight:700;font-variant-numeric:tabular-nums">${cf>=0?'+':''}${fmt(cf)}</div></div>
+        <div><div class="cap" style="margin-bottom:4px">Zhodnocení</div><div style="font-size:13px;color:#34d399;font-weight:700">+${pct(p.purchasePrice,p.currentPrice)}%</div></div>
+      </div>
+      <div style="margin-top:12px;height:3px;background:#1a1a2c;border-radius:2px">
+        <div style="height:100%;width:${Math.min(ltv,100)}%;background:linear-gradient(90deg,#dc2626,#f87171);border-radius:2px"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-top:5px">
+        <span class="cap">Hypotéka ${ltv}% hodnoty</span>
+        <span class="cap">${fmt(p.mortgage.remaining)} zbývá</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════
+// RENDER DETAIL
+// ═══════════════════════════════════════════════════
+function renderDetail() {
+  const p = properties.find(x=>x.id===currentDetailId); if(!p) return;
+  const cf = propCF(p);
+
+  document.getElementById('detail-name').textContent = p.name;
+  document.getElementById('detail-sub').textContent = `${p.address} · ${p.area} m² · ${p.type}`;
+
+  const badge = document.getElementById('detail-badge');
+  badge.textContent = `${statusEmoji[p.status]||''} ${p.status}`;
+  badge.style.background = (statusColor[p.status]||'#666')+'22';
+  badge.style.color = statusColor[p.status]||'#666';
+
+  const strip = document.getElementById('detail-cf-strip');
+  strip.style.background = cfBg(cf);
+  strip.style.border = `1.5px solid ${cfBorder(cf)}`;
+  document.getElementById('detail-cf-cap').style.color = cfColor(cf)+'66';
+  document.getElementById('detail-cf-cap').textContent = 'CASH FLOW / MĚSÍC';
+  document.getElementById('detail-cf-val').style.color = cfColor(cf);
+  document.getElementById('detail-cf-val').textContent = (cf>=0?'+':'')+fmt(cf);
+  document.getElementById('detail-cf-annual').style.color = cfColor(cf);
+  document.getElementById('detail-cf-annual').textContent = (cf>=0?'+':'')+fmt(cf*12);
+
+  // Reset tabs
+  document.querySelectorAll('[id^="tab-"]').forEach(t=>t.style.display='none');
+  document.querySelectorAll('.tab-pill').forEach(t=>t.classList.remove('active'));
+  document.getElementById('tab-'+currentDetailTab).style.display='block';
+  // Activate first pill
+  const pills = document.querySelectorAll('#screen-detail .tab-pill');
+  const tabMap = {prehled:0,finance:1,smlouva:2,hypoteka:3,poznamky:4};
+  pills[tabMap[currentDetailTab]]?.classList.add('active');
+
+  renderDetailTab(p, currentDetailTab);
+}
+
+function switchDetailTab(tab, btn) {
+  currentDetailTab = tab;
+  document.querySelectorAll('#screen-detail .tab-pill').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('[id^="tab-"]').forEach(t=>t.style.display='none');
+  document.getElementById('tab-'+tab).style.display='block';
+  const p = properties.find(x=>x.id===currentDetailId); if(!p) return;
+  renderDetailTab(p, tab);
+}
+
+function renderDetailTab(p, tab) {
+  const cf = propCF(p);
+  const totalExp = Object.values(p.expenses).reduce((a,b)=>a+b,0) + p.mortgage.monthly;
+
+  if (tab === 'prehled') {
+    document.getElementById('tab-prehled').innerHTML = `
+      <div class="gap12">
+        <div class="row2">
+          <div class="card" style="padding:14px"><div class="cap" style="margin-bottom:6px">Kupní cena</div><div class="h-sm num" style="color:#555;font-size:13px">${fmt(p.purchasePrice)}</div><div class="cap" style="margin-top:4px">${p.purchaseDate}</div></div>
+          <div class="card" style="padding:14px"><div class="cap" style="margin-bottom:6px">Aktuální cena</div><div class="h-sm num" style="color:#818cf8;font-size:13px">${fmt(p.currentPrice)}</div><div class="cap" style="margin-top:4px">odhadní hodnota</div></div>
+        </div>
+        <div class="row2">
+          <div class="card" style="padding:14px"><div class="cap" style="margin-bottom:6px">Zhodnocení</div><div class="h-sm num" style="color:#4ade80">+${pct(p.purchasePrice,p.currentPrice)}%</div><div class="cap" style="color:#4ade8066;margin-top:4px">+${fmt(p.currentPrice-p.purchasePrice)}</div></div>
+          <div class="card" style="padding:14px"><div class="cap" style="margin-bottom:6px">Hrubý výnos p.a.</div><div class="h-sm num" style="color:#34d399">${p.currentPrice>0?((p.income.rent*12)/p.currentPrice*100).toFixed(2):'0.00'}%</div><div class="cap" style="margin-top:4px">z tržní hodnoty</div></div>
+        </div>
+        <div class="card">
+          <div class="sec">DETAILY</div>
+          ${[['Typ',p.type],['Plocha',p.area+' m²'],['Datum koupě',p.purchaseDate||'—'],['Cena za m²',fmt(Math.round(p.currentPrice/(p.area||1)))],['Stav',p.status]].map(([l,v])=>`
+            <div class="data-row"><span style="font-size:13px;color:#444">${l}</span><span style="font-size:13px;color:#c8c8e0;font-weight:600">${v}</span></div>`).join('')}
+        </div>
+      </div>`;
+  }
+
+  if (tab === 'finance') {
+    document.getElementById('tab-finance').innerHTML = `
+      <div class="gap12">
+        <div class="card">
+          <div class="sec">PŘÍJMY / MĚSÍC</div>
+          <div class="data-row"><span style="font-size:13px;color:#555">Nájemné</span><span style="font-size:13px;color:#4ade80;font-weight:700;font-variant-numeric:tabular-nums">${fmt(p.income.rent)}</span></div>
+          <div class="data-row"><span style="font-size:13px;color:#555">Ostatní</span><span style="font-size:13px;color:#4ade80;font-weight:700;font-variant-numeric:tabular-nums">${fmt(p.income.other)}</span></div>
+          <div style="display:flex;justify-content:space-between;padding-top:12px"><span style="font-size:15px;font-weight:700;color:#dde">Celkem</span><span style="font-size:15px;color:#4ade80;font-weight:800;font-variant-numeric:tabular-nums">${fmt(p.income.rent+p.income.other)}</span></div>
+        </div>
+        <div class="card">
+          <div class="sec">VÝDAJE / MĚSÍC</div>
+          ${[['Hypotéka',p.mortgage.monthly],['Energie / poplatky',p.expenses.utilities],['Pojištění',p.expenses.insurance],['Údržba',p.expenses.maintenance],['Daň z nemovitosti',p.expenses.tax],['Správa',p.expenses.management]].map(([l,v])=>`
+            <div class="data-row"><span style="font-size:13px;color:#555">${l}</span><span style="font-size:13px;color:${v>0?'#f87171':'#2a2a3e'};font-weight:${v>0?700:400};font-variant-numeric:tabular-nums">${fmt(v)}</span></div>`).join('')}
+          <div style="display:flex;justify-content:space-between;padding-top:12px"><span style="font-size:15px;font-weight:700;color:#dde">Celkem</span><span style="font-size:15px;color:#f87171;font-weight:800;font-variant-numeric:tabular-nums">${fmt(totalExp)}</span></div>
+        </div>
+        <div class="card">
+          <div class="sec">ROČNÍ VÝHLED</div>
+          <div class="row2" style="gap:8px">
+            ${[['Příjmy',fmt((p.income.rent+p.income.other)*12),'#4ade80'],['Výdaje',fmt(totalExp*12),'#f87171'],['CF roč.',(cf>=0?'+':'')+fmt(cf*12),cfColor(cf)],['Zhodn.','+'+pct(p.purchasePrice,p.currentPrice)+'%','#818cf8']].map(([l,v,c])=>`
+              <div style="background:#0c0c18;border-radius:12px;padding:12px;text-align:center"><div class="cap" style="margin-bottom:5px">${l}</div><div class="h-sm num" style="color:${c};font-size:13px">${v}</div></div>`).join('')}
+          </div>
+        </div>
+      </div>`;
+  }
+
+  if (tab === 'smlouva') {
+    const daysLeft = p.tenant.contractEnd ? Math.ceil((new Date(p.tenant.contractEnd)-new Date())/86400000) : null;
+    const hasActiveTenant = p.tenant.name && p.tenant.name !== 'Volný' && p.tenant.contractEnd;
+    let bannerHtml = '';
+    if (daysLeft !== null) {
+      const bc = daysLeft<0?['#1c0a0a','#7f1d1d','#f87171','⚠️ Smlouva vypršela!']:daysLeft<90?['#1c1200','#713f12','#fbbf24','⚠️ Brzy vyprší smlouva']:['#052e16','#166534','#4ade80','✅ Smlouva platná'];
+      const subTxt = daysLeft>0?`${daysLeft} dní do konce · do ${fmtDateCZ(p.tenant.contractEnd)}`:`Vypršela před ${Math.abs(daysLeft)} dny`;
+      bannerHtml = `<div style="background:${bc[0]};border:1px solid ${bc[1]};border-radius:14px;padding:16px;margin-bottom:10px"><div style="font-size:13px;font-weight:700;color:${bc[2]}">${bc[3]}</div><div style="font-size:11px;color:#666;margin-top:5px">${subTxt}</div></div>`;
+    }
+    document.getElementById('tab-smlouva').innerHTML = `
+      <div class="gap10">
+        ${bannerHtml}
+        <div class="card">
+          <div class="sec">NÁJEMNÍK</div>
+          ${[['Jméno',p.tenant.name||'—'],['Nájemník od',fmtDateCZ(p.tenant.since)],['Smlouva do',fmtDateCZ(p.tenant.contractEnd)],['Výše nájmu',fmt(p.income.rent)],['Kauce',fmt(p.tenant.deposit)],['Kauce (násobek)',p.income.rent?(p.tenant.deposit/p.income.rent).toFixed(1)+'× nájmu':'—']].map(([l,v])=>`
+            <div class="data-row"><span style="font-size:13px;color:#444">${l}</span><span style="font-size:13px;color:#c8c8e0;font-weight:600">${v}</span></div>`).join('')}
+        </div>
+        ${hasActiveTenant
+          ? `<button class="btn btn-green" onclick="generateContract()">📄 Generovat dodatek — prodloužení nájmu</button>`
+          : `<div class="card" style="text-align:center;padding:22px"><div style="font-size:26px;margin-bottom:8px">🚫</div><div style="font-size:13px;color:#555">Byt nemá aktivního nájemníka se smlouvou.</div></div>`}
+      </div>`;
+  }
+
+  if (tab === 'hypoteka') {
+    const ltv = p.currentPrice>0 ? (p.mortgage.remaining/p.currentPrice*100).toFixed(1) : 0;
+    const equity = p.currentPrice-p.mortgage.remaining;
+    document.getElementById('tab-hypoteka').innerHTML = `
+      <div class="gap12">
+        <div class="card">
+          <div class="sec">HYPOTÉKA</div>
+          ${[['Zbývající dluh',fmt(p.mortgage.remaining),'#f87171'],['Měsíční splátka',fmt(p.mortgage.monthly),'#fbbf24'],['Úroková sazba',p.mortgage.rate+'% p.a.',null],['Splatnost do',p.mortgage.endDate||'—',null],['Roční úroky (orient.)',fmt(p.mortgage.remaining*p.mortgage.rate/100),'#f87171'],['Vlastní kapitál',fmt(equity),'#4ade80']].map(([l,v,c])=>`
+            <div class="data-row"><span style="font-size:13px;color:#444">${l}</span><span style="font-size:13px;color:${c||'#c8c8e0'};font-weight:${c?700:400};font-variant-numeric:tabular-nums">${v}</span></div>`).join('')}
+        </div>
+        <div class="card">
+          <div class="sec">LTV POMĚR</div>
+          <div style="height:22px;background:#181826;border-radius:11px;overflow:hidden;display:flex;margin-bottom:10px">
+            <div style="width:${Math.min(ltv,100)}%;background:linear-gradient(90deg,#dc2626,#f87171)"></div>
+            <div style="flex:1;background:linear-gradient(90deg,#16a34a88,#16a34a)"></div>
+          </div>
+          <div style="display:flex;justify-content:space-between">
+            <span style="font-size:11px;color:#f87171;font-weight:700">Dluh ${ltv}%</span>
+            <span style="font-size:11px;color:#4ade80;font-weight:700">Kapitál ${(100-ltv).toFixed(1)}%</span>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  if (tab === 'poznamky') {
+    document.getElementById('tab-poznamky').innerHTML = `
+      <div class="card">
+        <div class="sec">POZNÁMKY</div>
+        <div style="font-size:13px;line-height:1.85;color:#777;white-space:pre-wrap">${p.notes||'Žádné poznámky.'}</div>
+      </div>`;
+  }
+}
+
+// ═══════════════════════════════════════════════════
+// CONTRACT GENERATION
+// ═══════════════════════════════════════════════════
+function generateContract() {
+  const p = properties.find(x=>x.id===currentDetailId); if(!p) return;
+  const oldEnd = p.tenant.contractEnd;
+  const newStart = nextDay(oldEnd);
+  const newEnd = addOneYear(oldEnd);
+  const today = new Date().toISOString().split('T')[0];
+
+  const text = `DODATEK Č. 1 K NÁJEMNÍ SMLOUVĚ
+PRODLOUŽENÍ NÁJMU BYTU
+
+V Praze dne ${fmtDateCZ(today)}
+
+SMLUVNÍ STRANY
+
+Pronajímatel:
+(doplňte své jméno, adresu a rodné číslo / IČO)
+
+Nájemce:
+${p.tenant.name}
+(doplňte adresu trvalého bydliště a rodné číslo)
+
+PŘEDMĚT DODATKU
+
+Smluvní strany se dohodly na prodloužení nájemní smlouvy
+k bytu nacházejícímu se na adrese:
+
+  ${p.address}
+  Typ bytu: ${p.type}, ${p.area} m²
+
+PRODLOUŽENÍ DOBY NÁJMU
+
+Původní nájemní smlouva byla uzavřena na dobu určitou
+do ${fmtDateCZ(oldEnd)}.
+
+Tímto dodatkem se doba nájmu prodlužuje o 12 měsíců:
+
+  Nový začátek nájmu:  ${fmtDateCZ(newStart)}
+  Nový konec nájmu:    ${fmtDateCZ(newEnd)}
+
+VÝŠE NÁJEMNÉHO
+
+Měsíční nájemné zůstává ve výši ${fmt(p.income.rent)},
+splatné vždy do 5. dne příslušného měsíce na účet
+pronajímatele.
+
+Kauce složená nájemcem ve výši ${fmt(p.tenant.deposit)}
+zůstává v platnosti a bude vypořádána po skončení
+nájemního poměru.
+
+OSTATNÍ UJEDNÁNÍ
+
+Všechna ostatní ustanovení původní nájemní smlouvy
+zůstávají tímto dodatkem nedotčena a nadále platí
+v plném rozsahu.
+
+Tento dodatek je vyhotoven ve dvou stejnopisech.
+Každá ze smluvních stran obdrží jeden výtisk.
+
+───────────────────────────────────────────
+
+Pronajímatel:            Nájemce:
+
+____________________     ____________________
+podpis                   ${p.tenant.name}
+                         podpis
+
+V Praze dne ..........   V Praze dne ..........
+
+───────────────────────────────────────────
+Upozornění: Tento dokument je orientační šablonou.
+Doporučujeme ověřit soulad s aktuálním zněním
+zák. č. 89/2012 Sb. (občanský zákoník).`;
+
+  document.getElementById('contract-text').textContent = text;
+  document.getElementById('contract-subtitle').textContent = `Prodloužení nájmu · ${p.name}`;
+  document.getElementById('contract-modal').classList.add('open');
+}
+
+function closeContract() { document.getElementById('contract-modal').classList.remove('open'); }
+function copyContract() {
+  const text = document.getElementById('contract-text').textContent;
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(text).then(()=>showToast('✅ Zkopírováno do schránky!'));
+  } else {
+    const ta = document.createElement('textarea'); ta.value=text;
+    document.body.appendChild(ta); ta.select(); document.execCommand('copy');
+    document.body.removeChild(ta); showToast('✅ Zkopírováno!');
+  }
+}
+
+// ═══════════════════════════════════════════════════
+// DELETE
+// ═══════════════════════════════════════════════════
+function confirmDelete() { document.getElementById('confirm-overlay').classList.add('open'); }
+function closeConfirm()  { document.getElementById('confirm-overlay').classList.remove('open'); }
+function doDelete() {
+  properties = properties.filter(p=>p.id!==currentDetailId);
+  saveProperties(properties);
+  closeConfirm();
+  showToast('🗑 Nemovitost smazána');
+  goNav('list');
+}
+
+// ═══════════════════════════════════════════════════
+// FORM
+// ═══════════════════════════════════════════════════
+function resetForm() {
+  document.getElementById('f-name').value='';
+  document.getElementById('f-address').value='';
+  document.getElementById('f-type').value='2+1';
+  document.getElementById('f-area').value='60';
+  document.getElementById('f-purchase-price').value='0';
+  document.getElementById('f-current-price').value='0';
+  document.getElementById('f-purchase-date').value='';
+  document.getElementById('f-status').value='pronajato';
+  document.getElementById('f-rent').value='0';
+  document.getElementById('f-other-income').value='0';
+  document.getElementById('f-utilities').value='0';
+  document.getElementById('f-insurance').value='0';
+  document.getElementById('f-maintenance').value='0';
+  document.getElementById('f-tax').value='0';
+  document.getElementById('f-management').value='0';
+  document.getElementById('f-mort-monthly').value='0';
+  document.getElementById('f-mort-remaining').value='0';
+  document.getElementById('f-mort-rate').value='0';
+  document.getElementById('f-mort-end').value='';
+  document.getElementById('f-tenant-name').value='Volný';
+  document.getElementById('f-tenant-since').value='';
+  document.getElementById('f-tenant-end').value='';
+  document.getElementById('f-deposit').value='0';
+  document.getElementById('f-notes').value='';
+  // Reset status pills
+  document.querySelectorAll('#property-form .tab-pill').forEach(b=>b.classList.remove('active'));
+  document.querySelector('#property-form .tab-pill').classList.add('active');
+}
+
+function fillForm(p) {
+  document.getElementById('f-name').value = p.name||'';
+  document.getElementById('f-address').value = p.address||'';
+  document.getElementById('f-type').value = p.type||'2+1';
+  document.getElementById('f-area').value = p.area||60;
+  document.getElementById('f-purchase-price').value = p.purchasePrice||0;
+  document.getElementById('f-current-price').value = p.currentPrice||0;
+  document.getElementById('f-purchase-date').value = p.purchaseDate||'';
+  document.getElementById('f-status').value = p.status||'volný';
+  document.getElementById('f-rent').value = p.income?.rent||0;
+  document.getElementById('f-other-income').value = p.income?.other||0;
+  document.getElementById('f-utilities').value = p.expenses?.utilities||0;
+  document.getElementById('f-insurance').value = p.expenses?.insurance||0;
+  document.getElementById('f-maintenance').value = p.expenses?.maintenance||0;
+  document.getElementById('f-tax').value = p.expenses?.tax||0;
+  document.getElementById('f-management').value = p.expenses?.management||0;
+  document.getElementById('f-mort-monthly').value = p.mortgage?.monthly||0;
+  document.getElementById('f-mort-remaining').value = p.mortgage?.remaining||0;
+  document.getElementById('f-mort-rate').value = p.mortgage?.rate||0;
+  document.getElementById('f-mort-end').value = p.mortgage?.endDate||'';
+  document.getElementById('f-tenant-name').value = p.tenant?.name||'Volný';
+  document.getElementById('f-tenant-since').value = p.tenant?.since||'';
+  document.getElementById('f-tenant-end').value = p.tenant?.contractEnd||'';
+  document.getElementById('f-deposit').value = p.tenant?.deposit||0;
+  document.getElementById('f-notes').value = p.notes||'';
+  // Status pills
+  document.querySelectorAll('#property-form .tab-pill').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('#property-form .tab-pill').forEach(b=>{
+    if(b.textContent.trim()===p.status) b.classList.add('active');
+  });
+}
+
+function setStatus(val, btn) {
+  document.getElementById('f-status').value = val;
+  document.querySelectorAll('#property-form .tab-pill').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+function readForm() {
+  const n = s=>Number(s)||0;
+  return {
+    name: document.getElementById('f-name').value.trim(),
+    address: document.getElementById('f-address').value.trim(),
+    type: document.getElementById('f-type').value,
+    area: n(document.getElementById('f-area').value),
+    purchasePrice: n(document.getElementById('f-purchase-price').value),
+    currentPrice: n(document.getElementById('f-current-price').value),
+    purchaseDate: document.getElementById('f-purchase-date').value,
+    status: document.getElementById('f-status').value,
+    income: { rent: n(document.getElementById('f-rent').value), other: n(document.getElementById('f-other-income').value) },
+    expenses: {
+      utilities: n(document.getElementById('f-utilities').value),
+      insurance: n(document.getElementById('f-insurance').value),
+      maintenance: n(document.getElementById('f-maintenance').value),
+      tax: n(document.getElementById('f-tax').value),
+      management: n(document.getElementById('f-management').value),
+    },
+    mortgage: {
+      monthly: n(document.getElementById('f-mort-monthly').value),
+      remaining: n(document.getElementById('f-mort-remaining').value),
+      rate: Number(document.getElementById('f-mort-rate').value)||0,
+      endDate: document.getElementById('f-mort-end').value,
+    },
+    tenant: {
+      name: document.getElementById('f-tenant-name').value,
+      since: document.getElementById('f-tenant-since').value,
+      contractEnd: document.getElementById('f-tenant-end').value,
+      deposit: n(document.getElementById('f-deposit').value),
+    },
+    notes: document.getElementById('f-notes').value,
+  };
+}
+
+function saveProperty() {
+  const data = readForm();
+  if (!data.name) { showToast('⚠️ Zadej název nemovitosti'); return; }
+  if (isEditMode) {
+    properties = properties.map(p => p.id===editingId ? {...data, id:editingId} : p);
+    saveProperties(properties);
+    currentDetailId = editingId;
+    showToast('✅ Změny uloženy');
+    goNav('detail');
+  } else {
+    const newProp = {...data, id: Date.now()};
+    properties.push(newProp);
+    saveProperties(properties);
+    showToast('✅ Nemovitost přidána');
+    goNav('list');
+  }
+}
+
+// ═══════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════
+renderDashboard();
+</script>
+</body>
+</html>

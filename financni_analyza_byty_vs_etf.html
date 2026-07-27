@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Finanční analýza: Byty vs ETF</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #2c3e50 0%, #3498db 100%);
+            color: white;
+            padding: 40px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+        
+        .content {
+            padding: 40px;
+        }
+        
+        .input-section {
+            background: #f8f9fa;
+            padding: 30px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+        }
+        
+        .input-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        
+        .input-group {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .input-group label {
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #2c3e50;
+            font-size: 0.95em;
+        }
+        
+        .input-group input {
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1em;
+            transition: border-color 0.3s;
+        }
+        
+        .input-group input:focus {
+            outline: none;
+            border-color: #3498db;
+        }
+        
+        .btn {
+            background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+            color: white;
+            padding: 15px 40px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            margin-top: 20px;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(52, 152, 219, 0.4);
+        }
+        
+        .results {
+            margin-top: 40px;
+        }
+        
+        .comparison-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 25px;
+            margin-bottom: 30px;
+        }
+        
+        .card {
+            background: white;
+            border: 2px solid #e0e0e0;
+            border-radius: 15px;
+            padding: 25px;
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+        
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+        
+        .card.winner {
+            border-color: #27ae60;
+            background: linear-gradient(135deg, #ffffff 0%, #e8f8f5 100%);
+        }
+        
+        .card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+        
+        .card-title {
+            font-size: 1.5em;
+            font-weight: 700;
+            color: #2c3e50;
+        }
+        
+        .winner-badge {
+            background: #27ae60;
+            color: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: 600;
+        }
+        
+        .metric {
+            margin: 15px 0;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        
+        .metric-label {
+            font-size: 0.9em;
+            color: #7f8c8d;
+            margin-bottom: 5px;
+        }
+        
+        .metric-value {
+            font-size: 1.4em;
+            font-weight: 700;
+            color: #2c3e50;
+        }
+        
+        .metric-value.positive {
+            color: #27ae60;
+        }
+        
+        .metric-value.negative {
+            color: #e74c3c;
+        }
+        
+        .chart-container {
+            margin-top: 40px;
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            border: 2px solid #e0e0e0;
+        }
+        
+        .chart-title {
+            font-size: 1.3em;
+            font-weight: 700;
+            margin-bottom: 20px;
+            color: #2c3e50;
+        }
+        
+        canvas {
+            max-height: 400px;
+        }
+        
+        .timeline {
+            margin-top: 40px;
+            background: #f8f9fa;
+            padding: 30px;
+            border-radius: 15px;
+        }
+        
+        .timeline-item {
+            padding: 20px;
+            margin: 15px 0;
+            background: white;
+            border-left: 4px solid #3498db;
+            border-radius: 8px;
+        }
+        
+        .timeline-year {
+            font-size: 1.2em;
+            font-weight: 700;
+            color: #3498db;
+            margin-bottom: 10px;
+        }
+        
+        .summary {
+            background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 15px;
+            margin-top: 30px;
+        }
+        
+        .summary h3 {
+            font-size: 1.8em;
+            margin-bottom: 15px;
+        }
+        
+        .summary-text {
+            font-size: 1.1em;
+            line-height: 1.6;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        
+        th {
+            background: #34495e;
+            color: white;
+            padding: 15px;
+            text-align: left;
+            font-weight: 600;
+        }
+        
+        td {
+            padding: 12px 15px;
+            border-bottom: 1px solid #ecf0f1;
+        }
+        
+        tr:hover {
+            background: #f8f9fa;
+        }
+        
+        .highlight-row {
+            background: #fff9e6 !important;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 Finanční analýza investice</h1>
+            <p>Porovnání: Pronájem bytů vs Dividendové ETF</p>
+        </div>
+        
+        <div class="content">
+            <div class="input-section">
+                <h2 style="margin-bottom: 20px; color: #2c3e50;">⚙️ Vstupní parametry</h2>
+                
+                <div class="input-grid">
+                    <div class="input-group">
+                        <label>Hodnota jednoho bytu (Kč)</label>
+                        <input type="number" id="bytHodnota" value="1750000">
+                    </div>
+                    <div class="input-group">
+                        <label>Počet bytů</label>
+                        <input type="number" id="pocetBytu" value="2">
+                    </div>
+                    <div class="input-group">
+                        <label>Růst ceny nemovitostí (%/rok)</label>
+                        <input type="number" id="rustNemovitosti" value="5" step="0.1">
+                    </div>
+                    <div class="input-group">
+                        <label>Nájemné za byt (Kč/měsíc)</label>
+                        <input type="number" id="najem" value="6500">
+                    </div>
+                    <div class="input-group">
+                        <label>Růst nájemného (%/rok)</label>
+                        <input type="number" id="rustNajmu" value="3.5" step="0.1">
+                    </div>
+                    <div class="input-group">
+                        <label>Celková hypotéka (Kč)</label>
+                        <input type="number" id="hypoteka" value="2300000">
+                    </div>
+                    <div class="input-group">
+                        <label>Úrok hypotéky (%)</label>
+                        <input type="number" id="urokHypoteky" value="4.39" step="0.01">
+                    </div>
+                    <div class="input-group">
+                        <label>Splatnost hypotéky (let)</label>
+                        <input type="number" id="splatnost" value="30">
+                    </div>
+                    <div class="input-group">
+                        <label>Dividendový výnos ETF (%/rok)</label>
+                        <input type="number" id="dividendaETF" value="3.5" step="0.1">
+                    </div>
+                    <div class="input-group">
+                        <label>Růst hodnoty ETF (%/rok)</label>
+                        <input type="number" id="rustETF" value="7" step="0.1">
+                    </div>
+                    <div class="input-group">
+                        <label>Náklady na správu bytů (%)</label>
+                        <input type="number" id="nakladySprava" value="15" step="1">
+                    </div>
+                    <div class="input-group">
+                        <label>Daň z příjmu (%)</label>
+                        <input type="number" id="dan" value="15" step="1">
+                    </div>
+                </div>
+                
+                <button class="btn" onclick="vypocitat()">🔄 Přepočítat analýzu</button>
+            </div>
+            
+            <div class="results" id="results"></div>
+        </div>
+    </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        let chartInstance = null;
+        
+        function vypocitat() {
+            // Načtení vstupů
+            const bytHodnota = parseFloat(document.getElementById('bytHodnota').value);
+            const pocetBytu = parseInt(document.getElementById('pocetBytu').value);
+            const rustNemovitosti = parseFloat(document.getElementById('rustNemovitosti').value) / 100;
+            const najem = parseFloat(document.getElementById('najem').value);
+            const rustNajmu = parseFloat(document.getElementById('rustNajmu').value) / 100;
+            const hypoteka = parseFloat(document.getElementById('hypoteka').value);
+            const urokHypoteky = parseFloat(document.getElementById('urokHypoteky').value) / 100;
+            const splatnost = parseInt(document.getElementById('splatnost').value);
+            const dividendaETF = parseFloat(document.getElementById('dividendaETF').value) / 100;
+            const rustETF = parseFloat(document.getElementById('rustETF').value) / 100;
+            const nakladySprava = parseFloat(document.getElementById('nakladySprava').value) / 100;
+            const dan = parseFloat(document.getElementById('dan').value) / 100;
+            
+            // Výpočet měsíční splátky hypotéky
+            const mesicniUrok = urokHypoteky / 12;
+            const pocetSplatek = splatnost * 12;
+            const mesicniSplatka = hypoteka * (mesicniUrok * Math.pow(1 + mesicniUrok, pocetSplatek)) / 
+                                  (Math.pow(1 + mesicniUrok, pocetSplatek) - 1);
+            
+            // Analýza pro různá období
+            const roky = [5, 10, 15, 20, 25, 30];
+            let vysledky = [];
+            
+            roky.forEach(rok => {
+                // SCÉNÁŘ 1: Držení bytů
+                let hodnotaBytu = bytHodnota * pocetBytu * Math.pow(1 + rustNemovitosti, rok);
+                let aktualniBytNajem = najem * pocetBytu;
+                let celkoveNajemne = 0;
+                let celkoveNaklady = 0;
+                let zbyvajiciDluh = hypoteka;
+                
+                // Simulace rok po roku pro byty
+                for (let r = 1; r <= rok; r++) {
+                    let rocniNajem = aktualniBytNajem * 12;
+                    let nakladyRok = rocniNajem * nakladySprava;
+                    let cistyNajem = rocniNajem - nakladyRok;
+                    
+                    // Odpočet splátek hypotéky
+                    let rocniSplatky = mesicniSplatka * 12;
+                    
+                    // Výpočet úroků a jistiny za rok
+                    let zbytek = zbyvajiciDluh;
+                    let rocniUrok = 0;
+                    for (let m = 0; m < 12; m++) {
+                        let mesicniUrokCastka = zbytek * mesicniUrok;
+                        rocniUrok += mesicniUrokCastka;
+                        let jistina = mesicniSplatka - mesicniUrokCastka;
+                        zbytek -= jistina;
+                    }
+                    zbyvajiciDluh = Math.max(0, zbytek);
+                    
+                    let danitelnyPrijem = cistyNajem - rocniUrok;
+                    let danZPrijmu = Math.max(0, danitelnyPrijem * dan);
+                    
+                    let cistyCashflow = cistyNajem - rocniSplatky - danZPrijmu;
+                    celkoveNajemne += cistyCashflow;
+                    
+                    aktualniBytNajem *= (1 + rustNajmu);
+                }
+                
+                let cistyVynosPoProdeji1 = hodnotaBytu - zbyvajiciDluh + celkoveNajemne;
+                let kapitalKInvestici = hodnotaBytu - zbyvajiciDluh;
+                
+                // SCÉNÁŘ 2: Prodej a investice do ETF
+                let pocatecniKapital = (bytHodnota * pocetBytu) - hypoteka;
+                let hodnotaETF = pocatecniKapital;
+                let celkoveDividendy = 0;
+                
+                for (let r = 1; r <= rok; r++) {
+                    let rocniDividenda = hodnotaETF * dividendaETF;
+                    let danZDividend = rocniDividenda * dan;
+                    let cistaDividenda = rocniDividenda - danZDividend;
+                    celkoveDividendy += cistaDividenda;
+                    hodnotaETF *= (1 + rustETF);
+                }
+                
+                let cistyVynosETF = hodnotaETF + celkoveDividendy;
+                
+                vysledky.push({
+                    rok: rok,
+                    byty: {
+                        hodnotaNemovitosti: hodnotaBytu,
+                        zbyvajiciDluh: zbyvajiciDluh,
+                        cistyKapital: kapitalKInvestici,
+                        celkoveNajemne: celkoveNajemne,
+                        celkovyVynos: cistyVynosPoProdeji1
+                    },
+                    etf: {
+                        hodnotaPortfolia: hodnotaETF,
+                        celkoveDividendy: celkoveDividendy,
+                        celkovyVynos: cistyVynosETF
+                    },
+                    rozdil: cistyVynosPoProdeji1 - cistyVynosETF
+                });
+            });
+            
+            zobrazitVysledky(vysledky, mesicniSplatka);
+        }
+        
+        function zobrazitVysledky(vysledky, mesicniSplatka) {
+            const resultsDiv = document.getElementById('results');
+            
+            // Najít optimální rok
+            let maxRozdil = -Infinity;
+            let optimalniRok = 0;
+            let optimalniData = null;
+            
+            vysledky.forEach(v => {
+                if (v.rozdil > maxRozdil && v.rozdil > 0) {
+                    maxRozdil = v.rozdil;
+                    optimalniRok = v.rok;
+                    optimalniData = v;
+                }
+            });
+            
+            // Najít breakeven bod (kdy ETF začne být výhodnější)
+            let breakevenRok = null;
+            for (let i = 0; i < vysledky.length - 1; i++) {
+                if (vysledky[i].rozdil > 0 && vysledky[i+1].rozdil < 0) {
+                    breakevenRok = vysledky[i].rok;
+                    break;
+                }
+            }
+            
+            let html = '<h2 style="color: #2c3e50; margin-bottom: 25px;">📈 Výsledky analýzy</h2>';
+            
+            // Současná situace
+            html += `
+                <div class="card" style="margin-bottom: 30px;">
+                    <div class="card-header">
+                        <div class="card-title">💰 Současná situace</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-label">Celková hodnota nemovitostí</div>
+                        <div class="metric-value">${formatCena(vysledky[0].byty.hodnotaNemovitosti / Math.pow(1.05, 5) * Math.pow(1.05, 0))}</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-label">Dluh na hypotéce</div>
+                        <div class="metric-value negative">${formatCena(parseFloat(document.getElementById('hypoteka').value))}</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-label">Vlastní kapitál (Equity)</div>
+                        <div class="metric-value positive">${formatCena(parseFloat(document.getElementById('bytHodnota').value) * 2 - parseFloat(document.getElementById('hypoteka').value))}</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-label">Měsíční splátka hypotéky</div>
+                        <div class="metric-value">${formatCena(mesicniSplatka)}</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-label">Měsíční nájemné (2 byty, čisté)</div>
+                        <div class="metric-value positive">${formatCena(parseFloat(document.getElementById('najem').value) * 2 * 0.85)}</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-label">Měsíční cashflow (nájemné - splátka)</div>
+                        <div class="metric-value ${(parseFloat(document.getElementById('najem').value) * 2 * 0.85 - mesicniSplatka) > 0 ? 'positive' : 'negative'}">${formatCena(parseFloat(document.getElementById('najem').value) * 2 * 0.85 - mesicniSplatka)}</div>
+                    </div>
+                </div>
+            `;
+            
+            // Tabulka porovnání
+            html += '<div class="chart-container"><div class="chart-title">📊 Detailní porovnání podle let</div>';
+            html += '<table><thead><tr><th>Rok</th><th>Hodnota bytů</th><th>Zbývající dluh</th><th>Celkem (Byty)</th><th>Hodnota ETF</th><th>Celkem (ETF)</th><th>Rozdíl</th><th>Vítěz</th></tr></thead><tbody>';
+            
+            vysledky.forEach(v => {
+                const isOptimal = v.rok === optimalniRok;
+                html += `
+                    <tr ${isOptimal ? 'class="highlight-row"' : ''}>
+                        <td><strong>${v.rok} let</strong></td>
+                        <td>${formatCena(v.byty.hodnotaNemovitosti)}</td>
+                        <td style="color: #e74c3c;">${formatCena(v.byty.zbyvajiciDluh)}</td>
+                        <td><strong>${formatCena(v.byty.celkovyVynos)}</strong></td>
+                        <td>${formatCena(v.etf.hodnotaPortfolia)}</td>
+                        <td><strong>${formatCena(v.etf.celkovyVynos)}</strong></td>
+                        <td style="color: ${v.rozdil > 0 ? '#27ae60' : '#e74c3c'};">${formatCena(Math.abs(v.rozdil))}</td>
+                        <td><strong>${v.rozdil > 0 ? '🏠 Byty' : '📈 ETF'}</strong></td>
+                    </tr>
+                `;
+            });
+            
+            html += '</tbody></table></div>';
+            
+            // Doporučení
+            html += '<div class="summary">';
+            html += '<h3>🎯 Doporučení a závěry</h3>';
+            html += '<div class="summary-text">';
+            
+            if (optimalniRok > 0) {
+                html += `<p style="margin-bottom: 15px;"><strong>✅ Optimální strategie: Držet byty minimálně ${optimalniRok} let</strong></p>`;
+                html += `<p style="margin-bottom: 15px;">Po ${optimalniRok} letech budete mít o <strong>${formatCena(maxRozdil)}</strong> více než při okamžitém prodeji a investici do ETF.</p>`;
+                
+                if (breakevenRok) {
+                    html += `<p style="margin-bottom: 15px;">⚠️ Po ${breakevenRok} letech se výhodnost otáčí a ETF začíná být lepší volbou kvůli efektu složeného úročení.</p>`;
+                }
+            } else {
+                html += `<p style="margin-bottom: 15px;"><strong>✅ Optimální strategie: Prodat byty nyní a investovat do ETF</strong></p>`;
+                html += `<p style="margin-bottom: 15px;">ETF je výhodnější ve všech sledovaných obdobích díky vyššímu růstu a dividentám.</p>`;
+            }
+            
+            html += `
+                <p style="margin-top: 20px;"><strong>Klíčové faktory:</strong></p>
+                <ul style="margin-top: 10px; margin-left: 20px; line-height: 1.8;">
+                    <li>🏠 Byty mají výhodu v pravidelném cashflow z nájmu</li>
+                    <li>📉 Byty jsou zatíženy vysokou hypotékou s úrokem ${document.getElementById('urokHypoteky').value}%</li>
+                    <li>📈 ETF má výhodu v efektu složeného úročení (${document.getElementById('rustETF').value}% růst + ${document.getElementById('dividendaETF').value}% dividendy)</li>
+                    <li>💰 ETF nevyžaduje aktivní správu a má nižší náklady</li>
+                    <li>🔄 ETF je mnohem likvidnější než nemovitosti</li>
+                </ul>
+            `;
+            
+            html += '</div></div>';
+            
+            resultsDiv.innerHTML = html;
+            
+            // Vytvoření grafu
+            vykresliGraf(vysledky);
+        }
+        
+        function vykresliGraf(vysledky) {
+            const canvas = document.createElement('canvas');
+            canvas.id = 'myChart';
+            
+            const chartDiv = document.createElement('div');
+            chartDiv.className = 'chart-container';
+            chartDiv.innerHTML = '<div class="chart-title">📊 Vývoj celkového majetku v čase</div>';
+            chartDiv.appendChild(canvas);
+            
+            document.getElementById('results').appendChild(chartDiv);
+            
+            if (chartInstance) {
+                chartInstance.destroy();
+            }
+            
+            const ctx = canvas.getContext('2d');
+            chartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: vysledky.map(v => v.rok + ' let'),
+                    datasets: [
+                        {
+                            label: 'Byty (celková hodnota)',
+                            data: vysledky.map(v => v.byty.celkovyVynos),
+                            borderColor: '#3498db',
+                            backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                            tension: 0.4,
+                            fill: true,
+                            borderWidth: 3
+                        },
+                        {
+                            label: 'ETF (celková hodnota)',
+                            data: vysledky.map(v => v.etf.celkovyVynos),
+                            borderColor: '#27ae60',
+                            backgroundColor: 'rgba(39, 174, 96, 0.1)',
+                            tension: 0.4,
+                            fill: true,
+                            borderWidth: 3
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top',
+                            labels: {
+                                font: {
+                                    size: 14,
+                                    weight: 'bold'
+                                },
+                                padding: 20
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return context.dataset.label + ': ' + formatCena(context.parsed.y);
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            ticks: {
+                                callback: function(value) {
+                                    return (value / 1000000).toFixed(1) + ' mil Kč';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        function formatCena(cislo) {
+            return new Intl.NumberFormat('cs-CZ', {
+                style: 'currency',
+                currency: 'CZK',
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 0
+            }).format(cislo);
+        }
+        
+        // Automatický výpočet při načtení stránky
+        window.onload = function() {
+            vypocitat();
+        };
+    </script>
+</body>
+</html>
