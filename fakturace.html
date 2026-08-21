@@ -735,8 +735,13 @@ function calcOdpisyNemovitosti(nemovitosti, rok) {
 
 // Celkové roční pojištění ze všech nemovitostí
 function calcPojisteniNemovitosti(nemovitosti) {
+    // ⭐ OPRAVA C: pojištění vstupuje do §9 výdajů právě JEDNOU
+    // Lze zadat na 2 místech: Odpisy & daň (pojisteniRocni) NEBO Upravit detaily (expenses.insurance)
+    // Preferujeme pojisteniRocni; expenses.insurance je fallback — nikdy se nesčítají
     return (nemovitosti.properties || []).reduce((sum, p) => {
-        return sum + (p.pojisteniRocni || 0);
+        const zOdpisu = parseFloat(p.pojisteniRocni) || 0;
+        const zDetailu = parseFloat(p.expenses && p.expenses.insurance) || 0;
+        return sum + (zOdpisu > 0 ? zOdpisu : zDetailu);
     }, 0);
 }
 
@@ -767,9 +772,20 @@ const calcRocniPrijmy = (faktury, nemovitosti, rok, metoda9) => {
             var _a = p.income, _b = p.income;
             return sum + (((_a) ? _a.rent : 0) || 0) * 12 + (((_b) ? _b.other : 0) || 0) * 12;
         }, 0);
-    // Výdaje pronajímatele (měsíční × 12) — bez odpisů a pojistění (ty se přidávají zvlášť)
+    // ⭐ OPRAVA A+B: Výdaje pronajímatele — explicitní výčet polí
+    // Měsíční položky ×12: údržba, správa, fond vlastníka, utilities, další 1-3, fond oprav
+    // Roční položky ×1: daň z nemovitosti (tax) — insurance řeší calcPojisteniNemovitosti (1×)
+    // Textová pole (dalsiXNazev) se do součtu nikdy nedostanou
+    const _numExp = (v) => { const n = parseFloat(v); return isFinite(n) ? n : 0; };
     const nemovitostVydajeMesicni = (nemovitosti.properties || [])
-        .reduce((sum, p) => { var _a; return sum + (Object.values(p.expenses || {}).reduce((a, b) => a + (b || 0), 0) + (((_a = p.fondOprav) === null || _a === void 0 ? void 0 : _a.mesicne) || 0)) * 12; }, 0);
+        .reduce((sum, p) => {
+            const e = p.expenses || {};
+            const mesicni = _numExp(e.maintenance) + _numExp(e.management) + _numExp(e.fondVlastnik)
+                + _numExp(e.utilities) + _numExp(e.dalsi1Castka) + _numExp(e.dalsi2Castka) + _numExp(e.dalsi3Castka)
+                + _numExp(p.fondOprav && p.fondOprav.mesicne);
+            const rocniPolozky = _numExp(e.tax); // daň z nemovitosti je roční — jen 1×
+            return sum + mesicni * 12 + rocniPolozky;
+        }, 0);
     // Odpisy a pojistění — roční jednorázové
     const odpisy = calcOdpisyNemovitosti(nemovitosti, rok);
     const pojisteni = calcPojisteniNemovitosti(nemovitosti);
@@ -4834,6 +4850,13 @@ function DanZPrijmu({ data, updateData, notify }) {
         { id: "cestovne", label: "Cestovné a diety", hint: "Pracovní cesty, stravné" },
         { id: "kancellar", label: "Nájem kanceláře / home office", hint: "Poměrná část nájmu/hypotéky za pracovnu" },
         { id: "ostatni", label: "Ostatní daňové výdaje", hint: "Další uznatelné výdaje" },
+        // ⭐ SLEVY NA DANI (§35ba, §35c) — odečítají se od DANĚ, ne od základu
+        // Pozn.: Sleva na poplatníka (30 840 Kč) se uplatňuje AUTOMATICKY — nezadávejte ji sem!
+        { id: "sleva_manzel", label: "Sleva na manžela/ku (§35ba)", hint: "24 840 Kč/rok — příjem manžela/ky do 68 000 Kč, péče o dítě do 3 let" },
+        { id: "sleva_invalidita12", label: "Sleva invalidita I.+II. st. (§35ba)", hint: "2 520 Kč/rok" },
+        { id: "sleva_invalidita3", label: "Sleva invalidita III. st. (§35ba)", hint: "5 040 Kč/rok" },
+        { id: "sleva_ztpp", label: "Sleva držitel ZTP/P (§35ba)", hint: "16 140 Kč/rok" },
+        { id: "sleva_dite", label: "Daňové zvýhodnění na dítě (§35c)", hint: "15 204 Kč/rok 1. dítě, 22 320 Kč 2. dítě, 27 840 Kč 3.+ dítě" },
     ];
     const [showAddForm, setShowAddForm] = (0, useState)(false);
     const [newNaklad, setNewNaklad] = (0, useState)({ typ: "pojisteni", popis: "", castka: 0 });
@@ -4861,12 +4884,16 @@ function DanZPrijmu({ data, updateData, notify }) {
     };
     // §15 odpočty — snižují základ daně (lze i při paušálu)
     const PAR15_TYPY = ["hypoteka","dary","darovani_krve","darkovani_kostni_drene","penzijni","zivotni"];
+    // ⭐ Slevy na dani (§35ba/§35c) — odečítají se od DANĚ (po slevě na poplatníka)
+    const SLEVY_TYPY = ["sleva_manzel","sleva_invalidita12","sleva_invalidita3","sleva_ztpp","sleva_dite"];
     // §7 výdaje — snižují příjmy před výpočtem základu daně
-    const nakladyPar7 = naklady.filter(n => !PAR15_TYPY.includes(n.typ) && n.typ !== "sp_zaloha" && n.typ !== "zp_zaloha");
+    const nakladyPar7 = naklady.filter(n => !PAR15_TYPY.includes(n.typ) && !SLEVY_TYPY.includes(n.typ) && n.typ !== "sp_zaloha" && n.typ !== "zp_zaloha");
     const nakladyPar15 = naklady.filter(n => PAR15_TYPY.includes(n.typ));
+    const nakladySlevy = naklady.filter(n => SLEVY_TYPY.includes(n.typ));
     const totalNakladyPar7 = nakladyPar7.reduce((s, n) => s + n.castka, 0);
     const totalNakladyPar15 = nakladyPar15.reduce((s, n) => s + n.castka, 0);
-    const totalNaklady = nakladyPar7.reduce((s, n) => s + n.castka, 0); // jen §7 pro zobrazení výdajů
+    const totalSlevyNaDani = nakladySlevy.reduce((s, n) => s + n.castka, 0);
+    const totalNaklady = totalNakladyPar7 + totalNakladyPar15 + totalSlevyNaDani; // celkem vše v tabulce
 
     const rocni = calcRocniPrijmy(data.faktury, data.nemovitosti, rok, metoda9);
 
@@ -4901,7 +4928,8 @@ function DanZPrijmu({ data, updateData, notify }) {
     else {
         danSNaklady = DAN_Z_PRIJMU_FO.hranice * 0.15 + (zakladSNaklady - DAN_Z_PRIJMU_FO.hranice) * 0.23;
     }
-    const danPoSlevachSNaklady = Math.max(0, danSNaklady - DAN_Z_PRIJMU_FO.slevaPoplatnik);
+    // ⭐ Slevy na dani: poplatník (automaticky) + další slevy §35ba/§35c ze zadaných položek
+    const danPoSlevachSNaklady = Math.max(0, danSNaklady - DAN_Z_PRIJMU_FO.slevaPoplatnik - totalSlevyNaDani);
     const uspora = rocni.danPoSlevach - danPoSlevachSNaklady;
 
     // SP + ZP výpočet
@@ -4965,6 +4993,7 @@ function DanZPrijmu({ data, updateData, notify }) {
       <tr><td>Základ daně</td><td style="text-align:right">${formatCZK(zakladSNaklady)}</td></tr>
       <tr><td>Daň před slevami (15%/23%)</td><td style="text-align:right">${formatCZK(danSNaklady)}</td></tr>
       <tr><td>Sleva na poplatníka</td><td style="text-align:right">- ${formatCZK(DAN_Z_PRIJMU_FO.slevaPoplatnik)}</td></tr>
+      ${totalSlevyNaDani > 0 ? `<tr><td>Slevy na dani §35ba/§35c</td><td style="text-align:right">- ${formatCZK(totalSlevyNaDani)}</td></tr>` : ""}
       <tr class="red"><td><strong>DAŇ K ÚHRADĚ</strong></td><td style="text-align:right"><strong>${formatCZK(danPoSlevachSNaklady)}</strong></td></tr>
     </tbody></table>
     <p style="color:#666;font-size:11px;margin-top:20px">* Orientační podklady. Konzultujte s daňovým poradcem. Generováno ${new Date().toLocaleDateString("cs-CZ")}.</p>
@@ -5129,6 +5158,7 @@ function DanZPrijmu({ data, updateData, notify }) {
                         ["Daň 15% (do 1 582 812 Kč)", formatCZK(Math.min(zakladSNaklady, DAN_Z_PRIJMU_FO.hranice) * 0.15), false],
                         ["Daň 23% (nad 1 582 812 Kč)", formatCZK(Math.max(0, zakladSNaklady - DAN_Z_PRIJMU_FO.hranice) * 0.23), false],
                         ["Sleva na poplatníka", `- ${formatCZK(DAN_Z_PRIJMU_FO.slevaPoplatnik)}`, false],
+                        ...(totalSlevyNaDani > 0 ? [[`Slevy na dani §35ba/§35c (${nakladySlevy.map(n=>n.label.split("(")[0].trim()).join(", ")})`, `- ${formatCZK(totalSlevyNaDani)}`, false, "#7c3aed"]] : []),
                         ["= DAŇ K ÚHRADĚ", formatCZK(danPoSlevachSNaklady), true, "#dc2626"],
                     ].map(([k, v, bold, color], i) => (React.createElement("tr", { key: i, style: { background: bold ? "#f0f4fa" : "transparent" } },
                         React.createElement("td", { style: { padding: "7px 8px", borderBottom: "1px solid #f3f4f6", fontWeight: bold ? "700" : "400", fontSize: "12px" } }, k),
@@ -5215,6 +5245,18 @@ function DanZPrijmu({ data, updateData, notify }) {
                     React.createElement("td", { style: { padding: "10px 12px" } },
                         React.createElement(Btn, { onClick: () => delNaklad(n.id), variant: "danger", small: true }, "\uD83D\uDDD1")))))),
                 React.createElement("tfoot", null,
+                    totalNakladyPar7 > 0 && React.createElement("tr", { style: { background: "#fafafa" } },
+                        React.createElement("td", { colSpan: "2", style: { padding: "8px 12px", fontWeight: "600", fontSize: "12px", color: "#6b7280" } }, "\u2022 \u00A77 v\u00FDdaje (sni\u017Euj\u00ED p\u0159\u00EDjmy z podnik\u00E1n\u00ED)"),
+                        React.createElement("td", { style: { padding: "8px 12px", fontWeight: "600", fontSize: "12px", color: "#d97706" } }, "- ", formatCZK(totalNakladyPar7)),
+                        React.createElement("td", null)),
+                    totalNakladyPar15 > 0 && React.createElement("tr", { style: { background: "#fafafa" } },
+                        React.createElement("td", { colSpan: "2", style: { padding: "8px 12px", fontWeight: "600", fontSize: "12px", color: "#6b7280" } }, "\u2022 \u00A715 odpo\u010Dty (sni\u017Euj\u00ED z\u00E1klad dan\u011B)"),
+                        React.createElement("td", { style: { padding: "8px 12px", fontWeight: "600", fontSize: "12px", color: "#0891b2" } }, "- ", formatCZK(totalNakladyPar15)),
+                        React.createElement("td", null)),
+                    totalSlevyNaDani > 0 && React.createElement("tr", { style: { background: "#fafafa" } },
+                        React.createElement("td", { colSpan: "2", style: { padding: "8px 12px", fontWeight: "600", fontSize: "12px", color: "#6b7280" } }, "\u2022 Slevy na dani \u00A735ba/\u00A735c (sni\u017Euj\u00ED da\u0148)"),
+                        React.createElement("td", { style: { padding: "8px 12px", fontWeight: "600", fontSize: "12px", color: "#7c3aed" } }, "- ", formatCZK(totalSlevyNaDani)),
+                        React.createElement("td", null)),
                     React.createElement("tr", { style: { background: "#f0f4fa" } },
                         React.createElement("td", { colSpan: "2", style: { padding: "10px 12px", fontWeight: "700", fontSize: "13px" } }, "Celkem v\u00FDdaje a odpo\u010Dty"),
                         React.createElement("td", { style: { padding: "10px 12px", fontWeight: "700", fontSize: "14px", color: "#d97706" } },
