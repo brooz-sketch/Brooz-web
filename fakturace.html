@@ -642,6 +642,9 @@ const calcFakturaTotal = (polozky) => {
         celkem: Math.round((totalZaklad + totalDPH) * 100) / 100,
     };
 };
+// ⭐ Jednotný test storna — aplikace historicky používala "storno" i "stornována"
+const jeStorno = (f) => !!f && (f.stav === "storno" || f.stav === "stornována");
+
 const calcDPHHlaseni = (faktury, rok, kvartalNeboMesic, perioda) => {
     // perioda: "kvartal" nebo "mesic"
     // kvartalNeboMesic: číslo kvartálu (1-4) nebo číslo měsíce (1-12)
@@ -653,6 +656,8 @@ const calcDPHHlaseni = (faktury, rok, kvartalNeboMesic, perioda) => {
         mesice = kvartal === 1 ? [1,2,3] : kvartal === 2 ? [4,5,6] : kvartal === 3 ? [7,8,9] : [10,11,12];
     }
     const relevantni = faktury.filter((f) => {
+        // ⭐ OPRAVA: stornované faktury se do DPH nikdy nepočítají
+        if (f.stav === "stornována" || f.stav === "storno") return false;
         // ⭐ OPRAVA: DPH se řídí datem DUZP (datumUskutecneni), ne datem vystavení!
         // § 21 ZDPH: daňová povinnost vzniká ke dni uskutečnění zdanitelného plnění
         const d = new Date(f.datumUskutecneni || f.datumVystaveni);
@@ -749,10 +754,10 @@ const calcRocniPrijmy = (faktury, nemovitosti, rok, metoda9) => {
     metoda9 = metoda9 || "pausal30"; // "pausal30" nebo "skutecne"
     
     // §7 příjmy — jen zaplacené faktury (příjem vzniká při úhradě, ne vystavením)
-    // OPRAVA: správný stav je "stornována" ne "storno"
+    // ⭐ storno může být "storno" i "stornována" — jednotný filtr
     const fakturyRoku = faktury.filter((f) => 
         new Date(f.datumVystaveni).getFullYear() === rok && 
-        f.stav !== "stornována"
+        !jeStorno(f)
     );
     
     const fakturaceZaplacene = fakturyRoku.filter(f => f.stav === "uhrazena"); // OPRAVA: "uhrazena" ne "zaplacena"
@@ -3258,7 +3263,7 @@ function Dashboard({ data, notify }) {
     const mesic = rok === rokAkt ? mesicAkt : 12;
     const kvartal = Math.ceil(mesic / 3);
     
-    const fakturyRok = data.faktury.filter(f => new Date(f.datumVystaveni).getFullYear() === rok && f.stav !== "stornována");
+    const fakturyRok = data.faktury.filter(f => new Date(f.datumVystaveni).getFullYear() === rok && !jeStorno(f));
     const fakturyMesic = fakturyRok.filter(f => new Date(f.datumVystaveni).getMonth() + 1 === mesic);
     const poSplatnosti = data.faktury.filter(f => f.stav === "vystavena" && new Date(f.datumSplatnosti) < new Date());
     const sumRok = fakturyRok.reduce((s, f) => s + calcFakturaTotal(f.polozky || []).celkem, 0);
@@ -3801,8 +3806,9 @@ function Fakturace({ data, updateData, notify, setModal }) {
     };
     const deleteFaktura = (id) => setConfirmDel(id);
     const doDelete = (id) => {
-        updateData(prev => (Object.assign(Object.assign({}, prev), { faktury: prev.faktury.map(f => f.id === id ? Object.assign(Object.assign({}, f), { stav: "storno" }) : f) })));
-        notify("Faktura stornována.");
+        // ⭐ Trvalé smazání z dat. Storno se dělá výběrem stavu "Storno" v rozbalovacím menu.
+        updateData(prev => (Object.assign(Object.assign({}, prev), { faktury: prev.faktury.filter(x => x.id !== id) })));
+        notify("Faktura trvale smazána.");
         setConfirmDel(null);
     };
     const printFaktura = (f) => {
@@ -3861,11 +3867,14 @@ function Fakturace({ data, updateData, notify, setModal }) {
                                     React.createElement("option", { value: "uhrazena" }, "\u2705 Uhrazena"),
                                     React.createElement("option", { value: "po_splatnosti" }, "\u26A0\uFE0F Po splatnosti"),
                                     React.createElement("option", { value: "storno" }, "Storno")),
-                                f.stav !== "stornována" && React.createElement(Btn, { onClick: () => deleteFaktura(f.id), variant: "danger", small: true }, "\uD83D\uDDD1")))));
+                                React.createElement(Btn, { onClick: () => deleteFaktura(f.id), variant: "danger", small: true }, "\uD83D\uDDD1")))));
                 }))),
             faktury.length === 0 && React.createElement("p", { style: { textAlign: "center", color: "#9ca3af", padding: "40px" } }, "\u017D\u00E1dn\u00E9 faktury")),
         showForm && editFaktura && (React.createElement(FakturaForm, { faktura: editFaktura, zakaznici: data.zakaznici, firma: data.firma, onSave: saveFaktura, onClose: () => { setShowForm(false); setEditFaktura(null); } })),
-        confirmDel && (React.createElement(ConfirmDialog, { message: "Opravdu chcete stornovat fakturu? Faktura bude ozna\u010Dena jako Storno.", onYes: () => doDelete(confirmDel), onNo: () => setConfirmDel(null) })),
+        confirmDel && (React.createElement(ConfirmDialog, { message: (function() {
+            const f = data.faktury.find(x => x.id === confirmDel);
+            return "\u26A0\uFE0F Opravdu TRVALE smazat fakturu " + ((f && f.cislo) || "") + "? Tuto akci NELZE vr\u00E1tit. (Pokud chcete fakturu jen vy\u0159adit z v\u00FDpo\u010Dt\u016F, nastavte j\u00ED stav \u201EStorno\u201C.)";
+        })(), onYes: () => doDelete(confirmDel), onNo: () => setConfirmDel(null) })),
         printHtml && (React.createElement(PrintModal, { html: printHtml, title: printTitle, onClose: () => setPrintHtml(null) }))));
 }
 // ============================================================
@@ -4042,7 +4051,7 @@ function Zakaznici({ data, updateData, notify }) {
             if (filterAktivni === "neaktivni") return z.aktivni === false;
             return true;
         }).map(z => {
-            const faktury = data.faktury.filter(f => f.zakaznikId === z.id && f.stav !== "stornována");
+            const faktury = data.faktury.filter(f => f.zakaznikId === z.id && !jeStorno(f));
             const obrat = faktury.reduce((s, f) => s + calcFakturaTotal(f.polozky || []).celkem, 0);
             return (React.createElement(Card, { key: z.id },
                 React.createElement("div", { style: { display: "flex", justifyContent: "space-between", marginBottom: "8px" } },
