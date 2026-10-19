@@ -66,6 +66,17 @@ const DAN_Z_PRIJMU_FO = {
     hranice: 1582812, // hranice pro 23% sazbu (2024)
     slevaPoplatnik: 30840, // základní sleva na poplatníka (2024)
 };
+// ⭐ Hranice pro 23% sazbu (§16 ZDP) — mění se každý rok (2023: 48×, od 2024: 36× průměrné mzdy)
+const HRANICE_23_PO_ROCICH = { 2023: 1935552, 2024: 1582812, 2025: 1676052, 2026: 1762812 };
+const getHranice23 = (rok) => {
+    if (HRANICE_23_PO_ROCICH[rok]) return HRANICE_23_PO_ROCICH[rok];
+    const roky = Object.keys(HRANICE_23_PO_ROCICH).map(Number).sort((a, b) => a - b);
+    return rok < roky[0] ? HRANICE_23_PO_ROCICH[roky[0]] : HRANICE_23_PO_ROCICH[roky[roky.length - 1]];
+};
+const maHranici23ProRok = (rok) => !!HRANICE_23_PO_ROCICH[rok];
+// ⭐ Stropy výdajových paušálů (§7 odst. 7 a §9 odst. 4 ZDP)
+const STROP_PAUSAL_60 = 1200000;   // 60 % z příjmů max. do 2 000 000 Kč
+const STROP_PAUSAL_30_P9 = 600000; // 30 % z příjmů z nájmu max. do 2 000 000 Kč
 // ============================================================
 // UTILITY FUNCTIONS
 // ============================================================
@@ -750,7 +761,9 @@ function calcPojisteniNemovitosti(nemovitosti) {
     }, 0);
 }
 
-const calcRocniPrijmy = (faktury, nemovitosti, rok, metoda9) => {
+const calcRocniPrijmy = (faktury, nemovitosti, rok, metoda9, extraVydaje9) => {
+    // extraVydaje9 = další výdaje k pronájmu zadané v tabulce "Výdaje a odpočty" (zařazené k §9)
+    extraVydaje9 = parseFloat(extraVydaje9) || 0;
     metoda9 = metoda9 || "pausal30"; // "pausal30" nebo "skutecne"
     
     // §7 příjmy — jen zaplacené faktury (příjem vzniká při úhradě, ne vystavením)
@@ -795,20 +808,22 @@ const calcRocniPrijmy = (faktury, nemovitosti, rok, metoda9) => {
     const odpisy = calcOdpisyNemovitosti(nemovitosti, rok);
     const pojisteni = calcPojisteniNemovitosti(nemovitosti);
     // §9 výdaje
-    const par9PausalVydaje = Math.round(nemovitostPrijmy * 0.30);
-    const par9SkutecneVydaje = nemovitostVydajeMesicni + odpisy + pojisteni;
+    // ⭐ Paušál 30 % má zákonný strop 600 000 Kč (§9 odst. 4 ZDP)
+    const par9PausalVydaje = Math.min(Math.round(nemovitostPrijmy * 0.30), STROP_PAUSAL_30_P9);
+    const par9SkutecneVydaje = nemovitostVydajeMesicni + odpisy + pojisteni + extraVydaje9;
     const nemovitostVydaje = metoda9 === "skutecne" ? par9SkutecneVydaje : par9PausalVydaje;
     const zaklad9 = Math.max(0, nemovitostPrijmy - nemovitostVydaje);
     const celkemPrijmy = fakturacePrijmy + nemovitostPrijmy;
     const celkemVydaje = nemovitostVydaje;
     const zakladDane = celkemPrijmy - celkemVydaje;
     let dan = 0;
-    if (zakladDane <= DAN_Z_PRIJMU_FO.hranice) {
+    const hranice23 = getHranice23(rok); // ⭐ hranice dle zdaňovacího roku
+    if (zakladDane <= hranice23) {
         dan = zakladDane * (DAN_Z_PRIJMU_FO.sazba15 / 100);
     }
     else {
-        dan = DAN_Z_PRIJMU_FO.hranice * (DAN_Z_PRIJMU_FO.sazba15 / 100) +
-            (zakladDane - DAN_Z_PRIJMU_FO.hranice) * (DAN_Z_PRIJMU_FO.sazba23 / 100);
+        dan = hranice23 * (DAN_Z_PRIJMU_FO.sazba15 / 100) +
+            (zakladDane - hranice23) * (DAN_Z_PRIJMU_FO.sazba23 / 100);
     }
     const danPoSlevach = Math.max(0, dan - DAN_Z_PRIJMU_FO.slevaPoplatnik);
     return {
@@ -821,7 +836,9 @@ const calcRocniPrijmy = (faktury, nemovitosti, rok, metoda9) => {
         nemovitostPojisteni: Math.round(pojisteni * 100) / 100,
         nemovitostVydaje: Math.round(nemovitostVydaje * 100) / 100,
         par9PausalVydaje: Math.round(par9PausalVydaje * 100) / 100,
+        par9PausalStrop: Math.round(nemovitostPrijmy * 0.30) > STROP_PAUSAL_30_P9,
         par9SkutecneVydaje: Math.round(par9SkutecneVydaje * 100) / 100,
+        par9ExtraVydaje: Math.round(extraVydaje9 * 100) / 100,
         zaklad9: Math.round(zaklad9 * 100) / 100,
         celkemPrijmy: Math.round(celkemPrijmy * 100) / 100,
         celkemVydaje: Math.round(celkemVydaje * 100) / 100,
@@ -3760,6 +3777,7 @@ function Fakturace({ data, updateData, notify, setModal }) {
     const [confirmDel, setConfirmDel] = (0, useState)(null);
     const [printHtml, setPrintHtml] = (0, useState)(null);
     const [printTitle, setPrintTitle] = (0, useState)("");
+    const [nahled, setNahled] = (0, useState)(null); // ⭐ { html, title, faktura } — náhled bez automatického tisku
     const [rok, setRok] = (0, useState)(new Date().getFullYear());
     const faktury = data.faktury.filter(f => {
         var _a, _b;
@@ -3817,6 +3835,12 @@ function Fakturace({ data, updateData, notify, setModal }) {
         setPrintTitle(`Faktura ${f.cislo}`);
         setPrintHtml(html);
     };
+    // ⭐ Náhled faktury — stejné HTML jako tisk, ale bez automatického otevření tiskového dialogu
+    const nahledFaktura = (f) => {
+        const zak = data.zakaznici.find(z => z.id === f.zakaznikId);
+        const html = generateInvoiceHTML(f, data.firma, zak).split("<scr" + "ipt>window.onload=()=>window.print()</scr" + "ipt>").join("");
+        setNahled({ html: html, title: "Náhled faktury " + f.cislo, faktura: f });
+    };
     const setStav = (id, stav) => {
         updateData(prev => (Object.assign(Object.assign({}, prev), { faktury: prev.faktury.map(f => f.id === id ? Object.assign(Object.assign({}, f), { stav }) : f) })));
         notify("Stav faktury upraven.");
@@ -3861,6 +3885,7 @@ function Fakturace({ data, updateData, notify, setModal }) {
                         React.createElement("td", { style: { padding: "10px 12px" } },
                             React.createElement("div", { style: { display: "flex", gap: "4px", flexWrap: "wrap", alignItems: "center" } },
                                 React.createElement(Btn, { onClick: () => { setEditFaktura(f); setShowForm(true); }, variant: "secondary", small: true }, "\u270F\uFE0F"),
+                                React.createElement(Btn, { onClick: () => nahledFaktura(f), variant: "secondary", small: true }, "\uD83D\uDC41\uFE0F N\u00E1hled"),
                                 React.createElement(Btn, { onClick: () => printFaktura(f), variant: "secondary", small: true }, "\uD83D\uDDA8\uFE0F Tisk"),
                                 React.createElement("select", { value: f.stav, onChange: e => setStav(f.id, e.target.value), style: { padding: "4px 6px", border: "1px solid #d1d5db", borderRadius: "6px", fontSize: "11px", cursor: "pointer" } },
                                     React.createElement("option", { value: "vystavena" }, "Vystavena"),
@@ -3875,7 +3900,19 @@ function Fakturace({ data, updateData, notify, setModal }) {
             const f = data.faktury.find(x => x.id === confirmDel);
             return "\u26A0\uFE0F Opravdu TRVALE smazat fakturu " + ((f && f.cislo) || "") + "? Tuto akci NELZE vr\u00E1tit. (Pokud chcete fakturu jen vy\u0159adit z v\u00FDpo\u010Dt\u016F, nastavte j\u00ED stav \u201EStorno\u201C.)";
         })(), onYes: () => doDelete(confirmDel), onNo: () => setConfirmDel(null) })),
-        printHtml && (React.createElement(PrintModal, { html: printHtml, title: printTitle, onClose: () => setPrintHtml(null) }))));
+        printHtml && (React.createElement(PrintModal, { html: printHtml, title: printTitle, onClose: () => setPrintHtml(null) })),
+        // ⭐ Náhled faktury (bez tiskového dialogu)
+        nahled && React.createElement("div", { style: { position: "fixed", inset: 0, zIndex: 4000, display: "flex", flexDirection: "column", background: "#1a3a5c" } },
+            React.createElement("div", { style: { background: "#1a3a5c", padding: "10px 16px", flexShrink: 0, display: "flex", justifyContent: "space-between", alignItems: "center", gap: "8px", flexWrap: "wrap" } },
+                React.createElement("span", { style: { color: "#fff", fontWeight: "700", fontSize: "14px" } }, "👁️ " + nahled.title),
+                React.createElement("div", { style: { display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" } },
+                    React.createElement("button", { onClick: () => { const f = nahled.faktura; setNahled(null); printFaktura(f); },
+                        style: { padding: "10px 18px", background: "#16a34a", color: "#fff", border: "none", borderRadius: "8px", fontWeight: "700", fontSize: "14px", cursor: "pointer" } },
+                        "🖨️ Tisk"),
+                    React.createElement("button", { onClick: () => setNahled(null),
+                        style: { padding: "10px 18px", background: "rgba(255,255,255,0.15)", color: "#fff", border: "1px solid rgba(255,255,255,0.3)", borderRadius: "8px", fontWeight: "700", fontSize: "14px", cursor: "pointer" } },
+                        "✕ Zavřít"))),
+            React.createElement("iframe", { srcDoc: nahled.html, title: nahled.title, style: { flex: 1, border: "none", background: "#fff", width: "100%", height: "100%" } }))));
 }
 // ============================================================
 // FAKTURA FORM
@@ -4844,17 +4881,16 @@ function DanZPrijmu({ data, updateData, notify }) {
     const saveNaklady = (updated) => {
         updateData(prev => (Object.assign(Object.assign({}, prev), { danNaklady: Object.assign(Object.assign({}, (prev.danNaklady || {})), { [rok]: updated }) })));
     };
+    // ⭐ Odstraněno: "Výdajový paušál" (volí se přepínačem metody) a "SP+ZP pojištění" (pojistné OSVČ není daňový výdaj)
     const TYPY = [
-        { id: "pausal", label: "Výdajový paušál (§7 DPFO)", hint: "Paušální výdaje 60% z příjmů ze živnosti" },
-        { id: "pojisteni", label: "Sociální a zdravotní pojištění", hint: "Zaplacené zálohy SP+ZP OSVČ" },
-        { id: "hypoteka", label: "Úroky z hypotéky (§15 odst.3)", hint: "Zaplacené úroky, max 300 000 Kč/rok" },
-        { id: "auto_pausal", label: "Paušál na auto (§24 odst.2t)", hint: "Paušálně 5 000 Kč/měs = 60 000 Kč/rok" },
-        { id: "odpisy", label: "Odpisy majetku", hint: "Dle odpisového plánu ze záložky Majetek" },
-        { id: "dary", label: "Dary / bezúplatná plnění (§15)", hint: "Min. 1 000 Kč, max. 15% základu daně" },
+        { id: "hypoteka", label: "Úroky z hypotéky (§15 vlastní bydlení / §9 pronájem)", hint: "Vlastní bydlení (§15): max. 150 000 Kč/rok u smluv od 2021, 300 000 Kč u starších. Pronajímaný byt → zvolte §9 (bez limitu, jen při skutečných výdajích §9)." },
+        { id: "auto_pausal", label: "Paušál na auto (§24 odst.2 písm.zt)", hint: "5 000 Kč/měs (4 000 Kč při částečném soukromém užití), max. 3 vozidla. Jedno vozidlo jen jednou — buď §7, nebo §9. Nelze při paušálu." },
+        { id: "odpisy", label: "Odpisy majetku", hint: "Dle odpisového plánu ze záložky Majetek (jen při skutečných výdajích)" },
+        { id: "dary", label: "Dary / bezúplatná plnění (§15)", hint: "Min. 1 000 Kč nebo 2 % základu, max. 15 % základu daně" },
         { id: "darovani_krve", label: "Darování krve (§15 odst.1)", hint: "3 000 Kč za každý bezplatný odběr — lze i při paušálu!" },
         { id: "darkovani_kostni_drene", label: "Darování kostní dřeně (§15 odst.1)", hint: "20 000 Kč za odběr — lze i při paušálu!" },
-        { id: "penzijni", label: "Penzijní připojištění (§15 odst.5)", hint: "Max. 24 000 Kč/rok odpočet" },
-        { id: "zivotni", label: "Životní pojištění (§15 odst.6)", hint: "Max. 24 000 Kč/rok odpočet" },
+        { id: "penzijni", label: "Penzijní spoření / připojištění (§15a)", hint: "Odečitatelné jen příspěvky nad 20 400 Kč/rok. Od 2024 společný limit 48 000 Kč/rok s životním pojištěním a DIP." },
+        { id: "zivotni", label: "Životní pojištění (§15a)", hint: "Od 2024 společný limit 48 000 Kč/rok s penzijním spořením a DIP. Smlouva min. 60 měsíců." },
         { id: "dalsi_vzdelav", label: "Další vzdělávání / kurzy", hint: "Vzdělávání spojené s výkonem povolání" },
         { id: "cestovne", label: "Cestovné a diety", hint: "Pracovní cesty, stravné" },
         { id: "kancellar", label: "Nájem kanceláře / home office", hint: "Poměrná část nájmu/hypotéky za pracovnu" },
@@ -4867,8 +4903,35 @@ function DanZPrijmu({ data, updateData, notify }) {
         { id: "sleva_ztpp", label: "Sleva držitel ZTP/P (§35ba)", hint: "16 140 Kč/rok" },
         { id: "sleva_dite", label: "Daňové zvýhodnění na dítě (§35c)", hint: "15 204 Kč/rok 1. dítě, 22 320 Kč 2. dítě, 27 840 Kč 3.+ dítě" },
     ];
+    // §15 odpočty — snižují základ daně (lze i při paušálu)
+    const PAR15_TYPY = ["hypoteka","dary","darovani_krve","darkovani_kostni_drene","penzijni","zivotni"];
+    // ⭐ Slevy na dani (§35ba/§35c) — odečítají se od DANĚ (po slevě na poplatníka)
+    const SLEVY_TYPY = ["sleva_manzel","sleva_invalidita12","sleva_invalidita3","sleva_ztpp","sleva_dite"];
+    // ⭐ Typy, u kterých lze zvolit, zda patří k podnikání (§7) / vlastnímu bydlení (§15) nebo k pronájmu (§9)
+    const VOLBA_9_TYPY = ["hypoteka","auto_pausal","odpisy","dalsi_vzdelav","cestovne","kancellar","ostatni"];
+    // Staré typy, které už nejsou ve výběru a do daně nevstupují
+    const NEDANOVE_TYPY = ["pojisteni","pausal"];
+    // Zálohy SP/ZP uložené ve stejném seznamu — jen evidence, do daně nevstupují
+    const INFO_TYPY = ["sp_zaloha","zp_zaloha"];
+    const vychoziParagraf = (typ) => typ === "hypoteka" ? "15" : "7";
+    const volbyParagrafu = (typ) => typ === "hypoteka"
+        ? [{ value: "15", label: "§15 — vlastní bydlení" }, { value: "9", label: "§9 — pronajímaný byt" }]
+        : [{ value: "7", label: "§7 — podnikání" }, { value: "9", label: "§9 — pronájem" }];
+    const typInfo = (id) => TYPY.find(t => t.id === id) || {};
+    // Zařazení položky: "7" | "9" | "15" | "slevy" | "neuznatelne" | "info"
+    const zarazeni = (n) => {
+        if (INFO_TYPY.includes(n.typ)) return "info";
+        if (NEDANOVE_TYPY.includes(n.typ)) return "neuznatelne";
+        if (SLEVY_TYPY.includes(n.typ)) return "slevy";
+        if (n.paragraf === "9" && VOLBA_9_TYPY.includes(n.typ)) return "9";
+        if (PAR15_TYPY.includes(n.typ)) return "15";
+        return "7";
+    };
+    const nemovitostiList = ((data.nemovitosti && data.nemovitosti.properties) || []);
+    const nazevBytu = (id) => { const p = nemovitostiList.find(x => x.id === id); return p ? p.name : ""; };
+
     const [showAddForm, setShowAddForm] = (0, useState)(false);
-    const [newNaklad, setNewNaklad] = (0, useState)({ typ: "pojisteni", popis: "", castka: 0 });
+    const [newNaklad, setNewNaklad] = (0, useState)({ typ: "auto_pausal", popis: "", castka: 0, paragraf: "7", nemovitostId: "" });
     const addNaklad = () => {
         if (!newNaklad.castka || newNaklad.castka <= 0) {
             alert("Zadejte částku");
@@ -4882,8 +4945,12 @@ function DanZPrijmu({ data, updateData, notify }) {
             popis: newNaklad.popis || (typ === null || typ === void 0 ? void 0 : typ.label) || "",
             castka: parseFloat(newNaklad.castka) || 0,
         };
+        if (VOLBA_9_TYPY.includes(newNaklad.typ)) {
+            item.paragraf = newNaklad.paragraf || vychoziParagraf(newNaklad.typ);
+            if (item.paragraf === "9" && newNaklad.nemovitostId) item.nemovitostId = newNaklad.nemovitostId;
+        }
         saveNaklady(naklady.concat([item]));
-        setNewNaklad({ typ: "pojisteni", popis: "", castka: 0 });
+        setNewNaklad({ typ: "auto_pausal", popis: "", castka: 0, paragraf: "7", nemovitostId: "" });
         setShowAddForm(false);
         notify("Náklad přidán");
     };
@@ -4891,20 +4958,41 @@ function DanZPrijmu({ data, updateData, notify }) {
         saveNaklady(naklady.filter(n => n.id !== id));
         notify("Náklad odstraněn");
     };
-    // §15 odpočty — snižují základ daně (lze i při paušálu)
-    const PAR15_TYPY = ["hypoteka","dary","darovani_krve","darkovani_kostni_drene","penzijni","zivotni"];
-    // ⭐ Slevy na dani (§35ba/§35c) — odečítají se od DANĚ (po slevě na poplatníka)
-    const SLEVY_TYPY = ["sleva_manzel","sleva_invalidita12","sleva_invalidita3","sleva_ztpp","sleva_dite"];
-    // §7 výdaje — snižují příjmy před výpočtem základu daně
-    const nakladyPar7 = naklady.filter(n => !PAR15_TYPY.includes(n.typ) && !SLEVY_TYPY.includes(n.typ) && n.typ !== "sp_zaloha" && n.typ !== "zp_zaloha");
-    const nakladyPar15 = naklady.filter(n => PAR15_TYPY.includes(n.typ));
-    const nakladySlevy = naklady.filter(n => SLEVY_TYPY.includes(n.typ));
+    // ⭐ Změna zařazení existující položky (§7/§15 ↔ §9)
+    const setParagrafNaklad = (id, paragraf) => {
+        saveNaklady(naklady.map(n => n.id === id ? Object.assign({}, n, { paragraf: paragraf }) : n));
+    };
+    // §7 výdaje — snižují příjmy z podnikání (jen při skutečných výdajích §7)
+    const nakladyPar7 = naklady.filter(n => zarazeni(n) === "7");
+    // ⭐ §9 výdaje — k pronájmu (jen při skutečných výdajích §9)
+    const nakladyPar9 = naklady.filter(n => zarazeni(n) === "9");
+    const nakladyPar15 = naklady.filter(n => zarazeni(n) === "15");
+    const nakladySlevy = naklady.filter(n => zarazeni(n) === "slevy");
     const totalNakladyPar7 = nakladyPar7.reduce((s, n) => s + n.castka, 0);
+    const totalNakladyPar9 = nakladyPar9.reduce((s, n) => s + n.castka, 0);
     const totalNakladyPar15 = nakladyPar15.reduce((s, n) => s + n.castka, 0);
     const totalSlevyNaDani = nakladySlevy.reduce((s, n) => s + n.castka, 0);
-    const totalNaklady = totalNakladyPar7 + totalNakladyPar15 + totalSlevyNaDani; // celkem vše v tabulce
 
-    const rocni = calcRocniPrijmy(data.faktury, data.nemovitosti, rok, metoda9);
+    const rocni = calcRocniPrijmy(data.faktury, data.nemovitosti, rok, metoda9, totalNakladyPar9);
+
+    // ⭐ Uplatní se položka? §7 jen při skutečných výdajích §7, §9 jen při skutečných výdajích §9
+    const duvodNeuplatneni = (n) => {
+        const z = zarazeni(n);
+        if (z === "info") return "Záloha pojistného — spravujete v sekci SP/ZP, do daně nevstupuje";
+        if (z === "neuznatelne") return n.typ === "pojisteni"
+            ? "Pojistné OSVČ za sebe není daňový výdaj — nepočítá se"
+            : "Paušál se volí přepínačem metody nahoře — položka se nepočítá";
+        if (z === "7" && metodaVydaju === "pausal") return "Pokryto výdajovým paušálem 60 % — neuplatní se";
+        if (z === "9" && rocni.nemovitostPrijmy <= 0) return "Žádné příjmy z pronájmu v roce " + rok + " — neuplatní se";
+        if (z === "9" && metoda9 !== "skutecne") return "Pokryto paušálem 30 % u §9 — neuplatní se";
+        return null;
+    };
+    const uplatnenaPolozka = (n) => duvodNeuplatneni(n) === null;
+    const totalUplatneno = naklady.filter(uplatnenaPolozka).reduce((s, n) => s + n.castka, 0);
+    const totalNeuplatneno = naklady.filter(n => zarazeni(n) !== "info" && !uplatnenaPolozka(n)).reduce((s, n) => s + n.castka, 0);
+    const nekteraPokrytaPausalem = naklady.some(n => (zarazeni(n) === "7" && metodaVydaju === "pausal") || (zarazeni(n) === "9" && metoda9 !== "skutecne"));
+    const hranice23 = getHranice23(rok);
+    const fmtKc = (v) => Math.round(v).toLocaleString("cs-CZ") + " Kč";
 
     // Přijaté faktury jako skutečné náklady (pro metodu skutecne) — jdou do §7
     const prijateFakturyNaklady = (data.prijateFaktury||[]).filter(f => {
@@ -4912,8 +5000,10 @@ function DanZPrijmu({ data, updateData, notify }) {
         return d.getFullYear() === rok;
     }).reduce((s,f) => s + (f.castka||0), 0);
 
-    // Výdajový paušál: 60% z příjmů ze živnosti (§7)
-    const pausalVydaje = Math.round(rocni.fakturacePrijmy * 0.60);
+    // Výdajový paušál: 60% z příjmů ze živnosti (§7) — ⭐ zákonný strop 1 200 000 Kč (§7 odst. 7)
+    const pausalBezStropu = Math.round(rocni.fakturacePrijmy * 0.60);
+    const pausalVydaje = Math.min(pausalBezStropu, STROP_PAUSAL_60);
+    const pausalStropUplatnen = pausalBezStropu > STROP_PAUSAL_60;
 
     // Skutečné §7 náklady
     const skutecneNaklady = totalNakladyPar7 + prijateFakturyNaklady;
@@ -4930,16 +5020,14 @@ function DanZPrijmu({ data, updateData, notify }) {
     // Základ daně po §15 odpočtech (fungují v OBOU metodách)
     const zakladSNaklady = Math.max(0, zakladPred15 - totalNakladyPar15);
 
-    let danSNaklady = 0;
-    if (zakladSNaklady <= DAN_Z_PRIJMU_FO.hranice) {
-        danSNaklady = zakladSNaklady * 0.15;
-    }
-    else {
-        danSNaklady = DAN_Z_PRIJMU_FO.hranice * 0.15 + (zakladSNaklady - DAN_Z_PRIJMU_FO.hranice) * 0.23;
-    }
+    // ⭐ Daň 15 % / 23 % — hranice podle zdaňovacího roku
+    const danZeZakladu = (z) => z <= hranice23 ? z * 0.15 : hranice23 * 0.15 + (z - hranice23) * 0.23;
+    const danSNaklady = danZeZakladu(zakladSNaklady);
     // ⭐ Slevy na dani: poplatník (automaticky) + další slevy §35ba/§35c ze zadaných položek
     const danPoSlevachSNaklady = Math.max(0, danSNaklady - DAN_Z_PRIJMU_FO.slevaPoplatnik - totalSlevyNaDani);
-    const uspora = rocni.danPoSlevach - danPoSlevachSNaklady;
+    // ⭐ Úspora = vliv odpočtů §15 a slev na dani (bez nich by daň byla vyšší o tuto částku)
+    const danBezOdpoctu = Math.max(0, danZeZakladu(zakladPred15) - DAN_Z_PRIJMU_FO.slevaPoplatnik);
+    const uspora = danBezOdpoctu - danPoSlevachSNaklady;
 
     // SP + ZP výpočet
     const spzpMin = SP_ZP_MIN[rok] || SP_ZP_MIN[2025];
@@ -4969,11 +5057,17 @@ function DanZPrijmu({ data, updateData, notify }) {
     // Srovnávací výpočet §7 metod — §9 základ se nemění
     const zakladPausal = Math.max(0, rocni.fakturacePrijmy - pausalVydaje + rocni.zaklad9 - totalNakladyPar15);
     const zakladSkutecne = Math.max(0, rocni.fakturacePrijmy - skutecneNaklady + rocni.zaklad9 - totalNakladyPar15);
-    const calcDan = (z) => { const d = z <= DAN_Z_PRIJMU_FO.hranice ? z*0.15 : DAN_Z_PRIJMU_FO.hranice*0.15+(z-DAN_Z_PRIJMU_FO.hranice)*0.23; return Math.max(0, d - DAN_Z_PRIJMU_FO.slevaPoplatnik); };
+    // ⭐ Srovnání metod se stejnou hranicí a stejnými slevami jako hlavní výpočet
+    const calcDan = (z) => Math.max(0, danZeZakladu(z) - DAN_Z_PRIJMU_FO.slevaPoplatnik - totalSlevyNaDani);
     const danPausal = calcDan(zakladPausal);
     const danSkutecne = calcDan(zakladSkutecne);
     const printDan = () => {
-        const nakl_rows = naklady.map(n => `<tr><td>${n.label}</td><td>${n.popis}</td><td style="text-align:right">${formatCZK(n.castka)}</td></tr>`).join("");
+        const zarazeniTxt = { "7": "§7 podnikání", "9": "§9 pronájem", "15": "§15 odpočet", "slevy": "Sleva na dani", "neuznatelne": "—", "info": "—" };
+        const nakl_rows = naklady.map(n => {
+            const duvod = duvodNeuplatneni(n);
+            const zar = zarazeniTxt[zarazeni(n)] + (n.nemovitostId && zarazeni(n) === "9" ? " (" + nazevBytu(n.nemovitostId) + ")" : "");
+            return `<tr${duvod ? ' style="color:#9ca3af"' : ""}><td>${n.label}</td><td>${zar}</td><td>${n.popis}${duvod ? `<br><small>${duvod}</small>` : ""}</td><td style="text-align:right">${duvod ? "(" + formatCZK(n.castka) + ")" : formatCZK(n.castka)}</td></tr>`;
+        }).join("");
         const danHtml = `<!DOCTYPE html><html lang="cs"><head><meta charset="UTF-8">
     <title>Podklady daň z příjmu ${rok}</title>
     <style>body{font-family:Arial;margin:20mm;font-size:12px}h1,h2{color:#1a3a5c}
@@ -4990,13 +5084,15 @@ function DanZPrijmu({ data, updateData, notify }) {
       <tr class="hl"><td>Celkové příjmy</td><td style="text-align:right">${formatCZK(rocni.celkemPrijmy)}</td></tr>
     </tbody></table>
     <h2>Výdaje a odpočty</h2>
-    <table><thead><tr><th>Typ nákladu</th><th>Popis</th><th style="text-align:right">Částka</th></tr></thead>
+    <table><thead><tr><th>Typ nákladu</th><th>Patří k</th><th>Popis</th><th style="text-align:right">Částka</th></tr></thead>
     <tbody>
-      <tr><td>Výdaje na nemovitosti</td><td></td><td style="text-align:right">- ${formatCZK(rocni.nemovitostVydaje)}</td></tr>
       ${nakl_rows}
-      ${totalNakladyPar15 > 0 ? `<tr class="hl"><td colspan="2">§15 odpočty (hypotéka, dary, krv...)</td><td style="text-align:right">- ${formatCZK(totalNakladyPar15)}</td></tr>` : ""}
-      <tr class="hl"><td colspan="2">Výdaje a odpočty celkem</td><td style="text-align:right">- ${formatCZK(rocni.nemovitostVydaje + totalNakladyPar7)}</td></tr>
+      <tr class="hl"><td colspan="3">§7 výdaje — ${metodaVydaju === "pausal" ? "paušál 60 %" + (pausalStropUplatnen ? " (strop 1 200 000 Kč)" : "") : "skutečné"}</td><td style="text-align:right">- ${formatCZK(aktivniVydaje)}</td></tr>
+      <tr class="hl"><td colspan="3">§9 výdaje (pronájem) — ${metoda9 === "skutecne" ? "skutečné" : "paušál 30 %" + (rocni.par9PausalStrop ? " (strop 600 000 Kč)" : "")}</td><td style="text-align:right">- ${formatCZK(rocni.nemovitostVydaje)}</td></tr>
+      ${totalNakladyPar15 > 0 ? `<tr class="hl"><td colspan="3">§15 odpočty (hypotéka, dary, krev...)</td><td style="text-align:right">- ${formatCZK(totalNakladyPar15)}</td></tr>` : ""}
+      <tr class="hl"><td colspan="3">Výdaje a odpočty celkem</td><td style="text-align:right">- ${formatCZK(rocni.nemovitostVydaje + aktivniVydaje + totalNakladyPar15)}</td></tr>
     </tbody></table>
+    ${totalNeuplatneno > 0 ? `<p style="color:#666;font-size:11px">Položky v závorce se neuplatňují (pokryto paušálem nebo nedaňové).</p>` : ""}
     <h2>Výpočet daně</h2>
     <table><tbody>
       <tr><td>Základ daně</td><td style="text-align:right">${formatCZK(zakladSNaklady)}</td></tr>
@@ -5073,6 +5169,7 @@ function DanZPrijmu({ data, updateData, notify }) {
                 React.createElement("div", null, "\uD83D\uDDD2\uFE0F V\u00FDdaje pronaj\u00EDmatele: ", React.createElement("strong", null, formatCZK(rocni.nemovitostVydajeMesicni))),
                 rocni.nemovitostOdpisy > 0 && React.createElement("div", null, "\uD83C\uDFE0 Odpisy nemovitost\u00ED: ", React.createElement("strong", null, formatCZK(rocni.nemovitostOdpisy))),
                 rocni.nemovitostPojisteni > 0 && React.createElement("div", null, "\uD83D\uDEE1\uFE0F Poji\u0161t\u011Bn\u00ED nemovitost\u00ED: ", React.createElement("strong", null, formatCZK(rocni.nemovitostPojisteni))),
+                rocni.par9ExtraVydaje > 0 && React.createElement("div", null, "\uD83D\uDCCB Dal\u0161\u00ED v\u00FDdaje k pron\u00E1jmu (z tabulky n\u00ED\u017Ee): ", React.createElement("strong", null, formatCZK(rocni.par9ExtraVydaje))),
                 rocni.nemovitostOdpisy === 0 && React.createElement("div", { style: { color: "#9ca3af" } }, "\u26A0\uFE0F Odpisy: nepou\u017E\u00EDv\u00E1ny (nastav v z\u00E1lo\u017Ece Nemovitosti)"))),
 
         rocni.fakturaceNezaplaceneCount > 0 && React.createElement("div", { style: { background: "#fffbeb", border: "1px solid #fcd34d", borderRadius: "10px", padding: "12px 16px", marginBottom: "16px", fontSize: "13px" } },
@@ -5159,13 +5256,14 @@ function DanZPrijmu({ data, updateData, notify }) {
                         ...(metoda9 === "skutecne" && rocni.nemovitostVydajeMesicni > 0 ? [["  Výdaje pronajímatele", `- ${formatCZK(rocni.nemovitostVydajeMesicni)}`, false, "#6b7280"]] : []),
                         ...(metoda9 === "skutecne" && rocni.nemovitostOdpisy > 0 ? [["  Odpisy nemovitostí", `- ${formatCZK(rocni.nemovitostOdpisy)}`, false, "#6b7280"]] : []),
                         ...(metoda9 === "skutecne" && rocni.nemovitostPojisteni > 0 ? [["  Pojištění nemovitostí", `- ${formatCZK(rocni.nemovitostPojisteni)}`, false, "#6b7280"]] : []),
-                        ...(metoda9 === "pausal30" ? [["§9 paušál 30%", `- ${formatCZK(rocni.par9PausalVydaje)}`, false, "#d97706"]] : [["§9 skutečné výdaje", `- ${formatCZK(rocni.par9SkutecneVydaje)}`, false, "#d97706"]]),
+                        ...(metoda9 === "skutecne" && rocni.par9ExtraVydaje > 0 ? [["  Další výdaje k pronájmu (tabulka)", `- ${formatCZK(rocni.par9ExtraVydaje)}`, false, "#6b7280"]] : []),
+                        ...(metoda9 === "pausal30" ? [["§9 paušál 30%" + (rocni.par9PausalStrop ? " (strop 600 000 Kč)" : ""), `- ${formatCZK(rocni.par9PausalVydaje)}`, false, "#d97706"]] : [["§9 skutečné výdaje", `- ${formatCZK(rocni.par9SkutecneVydaje)}`, false, "#d97706"]]),
                         ["= Základ §9 (pronájem)", formatCZK(rocni.zaklad9), false, "#7c3aed"],
-                        [metodaVydaju === "pausal" ? "Výdajový paušál 60%" : "Skutečné náklady", `- ${formatCZK(aktivniVydaje)}`, false, "#d97706"],
+                        [metodaVydaju === "pausal" ? "Výdajový paušál 60%" + (pausalStropUplatnen ? " (strop 1 200 000 Kč)" : "") : "Skutečné náklady", `- ${formatCZK(aktivniVydaje)}`, false, "#d97706"],
                         ...(totalNakladyPar15 > 0 ? [[`§15 odpočty (${nakladyPar15.map(n=>n.label.split("(")[0].trim()).join(", ")})`, `- ${formatCZK(totalNakladyPar15)}`, false, "#7c3aed"]] : []),
                         ["= Základ daně", formatCZK(zakladSNaklady), true],
-                        ["Daň 15% (do 1 582 812 Kč)", formatCZK(Math.min(zakladSNaklady, DAN_Z_PRIJMU_FO.hranice) * 0.15), false],
-                        ["Daň 23% (nad 1 582 812 Kč)", formatCZK(Math.max(0, zakladSNaklady - DAN_Z_PRIJMU_FO.hranice) * 0.23), false],
+                        [`Daň 15% (do ${fmtKc(hranice23)})`, formatCZK(Math.min(zakladSNaklady, hranice23) * 0.15), false],
+                        [`Daň 23% (nad ${fmtKc(hranice23)})`, formatCZK(Math.max(0, zakladSNaklady - hranice23) * 0.23), false],
                         ["Sleva na poplatníka", `- ${formatCZK(DAN_Z_PRIJMU_FO.slevaPoplatnik)}`, false],
                         ...(totalSlevyNaDani > 0 ? [[`Slevy na dani §35ba/§35c (${nakladySlevy.map(n=>n.label.split("(")[0].trim()).join(", ")})`, `- ${formatCZK(totalSlevyNaDani)}`, false, "#7c3aed"]] : []),
                         ["= DAŇ K ÚHRADĚ", formatCZK(danPoSlevachSNaklady), true, "#dc2626"],
@@ -5174,26 +5272,38 @@ function DanZPrijmu({ data, updateData, notify }) {
                         React.createElement("td", { style: { padding: "7px 8px", borderBottom: "1px solid #f3f4f6", textAlign: "right", fontWeight: bold ? "700" : "400", color: color || "inherit", fontSize: "12px" } }, v)))))),
                 uspora > 0 && (React.createElement("div", { style: { marginTop: "10px", padding: "8px 12px", background: "#f0fdf4", border: "1px solid #86efac",
                         borderRadius: "8px", fontSize: "12px", color: "#16a34a", fontWeight: "600" } },
-                    "\uD83D\uDC9A Odpo\u010Dty \u0161et\u0159\u00ED: ",
+                    "\uD83D\uDC9A Odpo\u010Dty \u00A715 a slevy na dani \u0161et\u0159\u00ED: ",
                     formatCZK(uspora),
                     " na dani")),
                 React.createElement("div", { style: { marginTop: "12px" } },
                     React.createElement(Btn, { onClick: printDan }, "\uD83D\uDDA8\uFE0F Tisk podklad\u016F pro DP"))),
             React.createElement(Card, { style: { background: "#f0fdf4", border: "1px solid #86efac" } },
-                React.createElement("h3", { style: { marginTop: 0, color: "#15803d" } }, "\u2139\uFE0F Term\u00EDny a sazby 2024/2025"),
+                React.createElement("h3", { style: { marginTop: 0, color: "#15803d" } }, "\u2139\uFE0F Term\u00EDny a sazby " + rok),
                 React.createElement("div", { style: { fontSize: "12px", lineHeight: "1.9", color: "#166534" } },
                     React.createElement("p", null,
-                        React.createElement("strong", null, "Term\u00EDn pod\u00E1n\u00ED DP:"),
+                        React.createElement("strong", null, "Term\u00EDn pod\u00E1n\u00ED DP za rok " + rok + ":"),
                         React.createElement("br", null),
-                        "Bez poradce: 1. dubna",
+                        "Pap\u00EDrov\u011B: do 1. 4. " + (rok + 1),
                         React.createElement("br", null),
-                        "S da\u0148ov\u00FDm poradcem: 1. \u010Dervence"),
+                        "Elektronicky: do 1. 5. " + (rok + 1),
+                        React.createElement("br", null),
+                        "S da\u0148ov\u00FDm poradcem: do 1. 7. " + (rok + 1),
+                        React.createElement("br", null),
+                        React.createElement("span", { style: { fontSize: "11px", opacity: 0.8 } }, "(p\u0159ipadne-li na v\u00EDkend/sv\u00E1tek, posouv\u00E1 se na nejbli\u017E\u0161\u00ED pracovn\u00ED den)")),
                     React.createElement("p", null,
-                        React.createElement("strong", null, "Sazby DPFO 2024:"),
+                        React.createElement("strong", null, "Sazby DPFO " + rok + ":"),
                         React.createElement("br", null),
-                        "15% \u2013 z\u00E1klad do 1 582 812 K\u010D",
+                        "15% \u2013 z\u00E1klad do " + fmtKc(hranice23),
                         React.createElement("br", null),
-                        "23% \u2013 z\u00E1klad nad 1 582 812 K\u010D"),
+                        "23% \u2013 z\u00E1klad nad " + fmtKc(hranice23),
+                        !maHranici23ProRok(rok) && React.createElement("br", null),
+                        !maHranici23ProRok(rok) && React.createElement("span", { style: { color: "#b45309", fontSize: "11px" } }, "\u26A0\uFE0F Hranice pro rok " + rok + " zat\u00EDm nen\u00ED v aplikaci \u2014 pou\u017Eita posledn\u00ED zn\u00E1m\u00E1 hodnota.")),
+                    React.createElement("p", null,
+                        React.createElement("strong", null, "Stropy pau\u0161\u00E1l\u016F:"),
+                        React.createElement("br", null),
+                        "\u00A77 pau\u0161\u00E1l 60 %: max. 1 200 000 K\u010D",
+                        React.createElement("br", null),
+                        "\u00A79 pau\u0161\u00E1l 30 %: max. 600 000 K\u010D"),
                     React.createElement("p", null,
                         React.createElement("strong", null, "Sleva na poplatn\u00EDka:"),
                         React.createElement("br", null),
@@ -5209,13 +5319,17 @@ function DanZPrijmu({ data, updateData, notify }) {
                         '>',
                         " 150 000 K\u010D \u2192 \u010Dtvrtletn\u00ED z\u00E1lohy"),
                     React.createElement("p", null,
-                        React.createElement("strong", null, "Pau\u0161\u00E1l na auto \u00A724(2t):"),
+                        React.createElement("strong", null, "Pau\u0161\u00E1l na auto \u00A724(2)(zt):"),
                         React.createElement("br", null),
-                        "5 000 K\u010D/m\u011Bs = 60 000 K\u010D/rok"),
+                        "5 000 K\u010D/m\u011Bs = 60 000 K\u010D/rok (4 000 K\u010D/m\u011Bs p\u0159i \u010D\u00E1ste\u010Dn\u00E9m soukrom\u00E9m u\u017Eit\u00ED)",
+                        React.createElement("br", null),
+                        "Jen p\u0159i skute\u010Dn\u00FDch v\u00FDdaj\u00EDch, jedno vozidlo jen jednou (\u00A77 nebo \u00A79)"),
                     React.createElement("p", null,
-                        React.createElement("strong", null, "Hypot\u00E9ka \u00A715(3):"),
+                        React.createElement("strong", null, "Hypot\u00E9ka \u00A715(3) \u2014 vlastn\u00ED bydlen\u00ED:"),
                         React.createElement("br", null),
-                        "Max. odpo\u010Det \u00FArok\u016F 300 000 K\u010D/rok")))),
+                        "Max. 150 000 K\u010D/rok (smlouvy od 2021), 300 000 K\u010D (star\u0161\u00ED)",
+                        React.createElement("br", null),
+                        "U pronaj\u00EDman\u00E9ho bytu jde o v\u00FDdaj \u00A79")))),
         printHtml && React.createElement(PrintModal, { html: printHtml, title: `Daň z příjmu ${rok}`, onClose: () => setPrintHtml(null) }),
         React.createElement(Card, null,
             React.createElement("div", { style: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" } },
@@ -5226,51 +5340,99 @@ function DanZPrijmu({ data, updateData, notify }) {
             showAddForm && (React.createElement("div", { style: { background: "#f8fafc", border: "1px solid #e5e7eb", borderRadius: "10px", padding: "16px", marginBottom: "16px" } },
                 React.createElement("div", { style: { display: "grid", gridTemplateColumns: "2fr 1fr 1fr auto", gap: "10px", alignItems: "flex-end" } },
                     React.createElement("div", null,
-                        React.createElement("div", { style: { fontSize: "11px", fontWeight: "600", color: "#374151", marginBottom: "4px" } }, "Typ n\u00E1kladu"),
-                        React.createElement("select", { value: newNaklad.typ, onChange: e => setNewNaklad(p => { var _a; return (Object.assign(Object.assign({}, p), { typ: e.target.value, popis: ((_a = TYPY.find(t => t.id === e.target.value)) === null || _a === void 0 ? void 0 : _a.label) || "" })); }), style: { width: "100%", padding: "8px 10px", border: "1px solid #d1d5db", borderRadius: "6px", fontSize: "12px" } }, TYPY.map(t => React.createElement("option", { key: t.id, value: t.id }, t.label))),
-                        React.createElement("div", { style: { fontSize: "10px", color: "#9ca3af", marginTop: "3px" } }, (_a = TYPY.find(t => t.id === newNaklad.typ)) === null || _a === void 0 ? void 0 : _a.hint)),
+                        React.createElement("div", { style: { fontSize: "11px", fontWeight: "600", color: "#374151", marginBottom: "4px" } }, "Typ nákladu"),
+                        React.createElement("select", { value: newNaklad.typ, onChange: e => { const v = e.target.value; setNewNaklad(p => Object.assign({}, p, { typ: v, popis: typInfo(v).label || "", paragraf: vychoziParagraf(v), nemovitostId: "" })); }, style: { width: "100%", padding: "8px 10px", border: "1px solid #d1d5db", borderRadius: "6px", fontSize: "12px" } }, TYPY.map(t => React.createElement("option", { key: t.id, value: t.id }, t.label))),
+                        React.createElement("div", { style: { fontSize: "10px", color: "#9ca3af", marginTop: "3px" } }, typInfo(newNaklad.typ).hint)),
                     React.createElement("div", null,
-                        React.createElement("div", { style: { fontSize: "11px", fontWeight: "600", color: "#374151", marginBottom: "4px" } }, "Popis (voliteln\u00FD)"),
-                        React.createElement("input", { value: newNaklad.popis, onChange: e => setNewNaklad(p => (Object.assign(Object.assign({}, p), { popis: e.target.value }))), placeholder: "Up\u0159esn\u011Bn\u00ED...", style: { width: "100%", padding: "8px 10px", border: "1px solid #d1d5db", borderRadius: "6px", fontSize: "12px", boxSizing: "border-box" } })),
+                        React.createElement("div", { style: { fontSize: "11px", fontWeight: "600", color: "#374151", marginBottom: "4px" } }, "Popis (volitelný)"),
+                        React.createElement("input", { value: newNaklad.popis, onChange: e => setNewNaklad(p => (Object.assign(Object.assign({}, p), { popis: e.target.value }))), placeholder: "Upřesnění...", style: { width: "100%", padding: "8px 10px", border: "1px solid #d1d5db", borderRadius: "6px", fontSize: "12px", boxSizing: "border-box" } })),
                     React.createElement("div", null,
-                        React.createElement("div", { style: { fontSize: "11px", fontWeight: "600", color: "#374151", marginBottom: "4px" } }, "\u010C\u00E1stka (K\u010D)"),
+                        React.createElement("div", { style: { fontSize: "11px", fontWeight: "600", color: "#374151", marginBottom: "4px" } }, "Částka (Kč)"),
                         React.createElement("input", { type: "number", value: newNaklad.castka || "", onChange: e => setNewNaklad(p => (Object.assign(Object.assign({}, p), { castka: parseFloat(e.target.value) || 0 }))), placeholder: "0", style: { width: "100%", padding: "8px 10px", border: "1px solid #d1d5db", borderRadius: "6px", fontSize: "12px", boxSizing: "border-box" } })),
-                    React.createElement(Btn, { onClick: addNaklad, variant: "success" }, "\u2713 P\u0159idat")))),
+                    React.createElement(Btn, { onClick: addNaklad, variant: "success" }, "✓ Přidat")),
+                // ⭐ Zařazení: §7 podnikání / §15 vlastní bydlení ↔ §9 pronájem
+                VOLBA_9_TYPY.includes(newNaklad.typ) && React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginTop: "10px" } },
+                    React.createElement("div", null,
+                        React.createElement("div", { style: { fontSize: "11px", fontWeight: "600", color: "#374151", marginBottom: "4px" } }, "Patří k"),
+                        React.createElement("select", { value: newNaklad.paragraf || vychoziParagraf(newNaklad.typ), onChange: e => { const v = e.target.value; setNewNaklad(p => Object.assign({}, p, { paragraf: v, nemovitostId: v === "9" ? p.nemovitostId : "" })); }, style: { width: "100%", padding: "8px 10px", border: "1px solid #d1d5db", borderRadius: "6px", fontSize: "12px" } },
+                            volbyParagrafu(newNaklad.typ).map(o => React.createElement("option", { key: o.value, value: o.value }, o.label)))),
+                    newNaklad.paragraf === "9" && React.createElement("div", null,
+                        React.createElement("div", { style: { fontSize: "11px", fontWeight: "600", color: "#374151", marginBottom: "4px" } }, "Nemovitost (volitelné)"),
+                        React.createElement("select", { value: newNaklad.nemovitostId || "", onChange: e => { const v = e.target.value; setNewNaklad(p => Object.assign({}, p, { nemovitostId: v })); }, style: { width: "100%", padding: "8px 10px", border: "1px solid #d1d5db", borderRadius: "6px", fontSize: "12px" } },
+                            [React.createElement("option", { key: "", value: "" }, "— obecně k pronájmu —")].concat(nemovitostiList.map(p => React.createElement("option", { key: p.id, value: p.id }, p.name)))))),
+                (function() {
+                    const z = zarazeni({ typ: newNaklad.typ, paragraf: VOLBA_9_TYPY.includes(newNaklad.typ) ? (newNaklad.paragraf || vychoziParagraf(newNaklad.typ)) : undefined });
+                    const varovani = z === "7" && metodaVydaju === "pausal"
+                        ? "⚠️ Máte zvolený výdajový paušál 60 % — výdaj k podnikání (§7) se neuplatní."
+                        : z === "9" && metoda9 !== "skutecne"
+                            ? "⚠️ U §9 máte zvolený paušál 30 % — výdaj k pronájmu se neuplatní, dokud §9 nepřepnete na skutečné výdaje."
+                            : null;
+                    return varovani && React.createElement("div", { style: { marginTop: "10px", fontSize: "11px", color: "#92400e", background: "#fffbeb", border: "1px solid #fcd34d", borderRadius: "6px", padding: "6px 10px" } }, varovani);
+                })())),
+            // ⭐ Upozornění: položky pokryté paušálem
+            naklady.length > 0 && nekteraPokrytaPausalem && React.createElement("div", { style: { marginBottom: "12px", fontSize: "12px", color: "#92400e", background: "#fffbeb", border: "1px solid #fcd34d", borderRadius: "8px", padding: "10px 12px", lineHeight: "1.6" } },
+                "ℹ️ ",
+                metodaVydaju === "pausal" ? "U §7 máte zvolený výdajový paušál 60 % — výdaje k podnikání jsou jím pokryty a neuplatňují se. " : "",
+                metoda9 !== "skutecne" ? "U §9 máte zvolený paušál 30 % — výdaje k pronájmu jsou jím pokryty. " : "",
+                "Odpočty §15 a slevy na dani se uplatňují vždy."),
             naklady.length === 0 ? (React.createElement("div", { style: { textAlign: "center", padding: "32px", color: "#9ca3af" } },
-                React.createElement("div", { style: { fontSize: "32px", marginBottom: "8px" } }, "\uD83D\uDCCB"),
+                React.createElement("div", { style: { fontSize: "32px", marginBottom: "8px" } }, "📋"),
                 React.createElement("div", { style: { fontSize: "13px" } },
-                    "Zat\u00EDm \u017E\u00E1dn\u00E9 v\u00FDdaje a odpo\u010Dty pro rok ",
+                    "Zatím žádné výdaje a odpočty pro rok ",
                     rok,
                     "."),
-                React.createElement("div", { style: { fontSize: "12px", marginTop: "4px" } }, "P\u0159idejte pojistn\u00E9, \u00FAroky hypot\u00E9ky, pau\u0161\u00E1ly a dal\u0161\u00ED odpo\u010Dty."))) : (React.createElement("table", { style: { width: "100%", borderCollapse: "collapse" } },
+                React.createElement("div", { style: { fontSize: "12px", marginTop: "4px" } }, "Přidejte úroky hypotéky, paušál na auto, dary a další odpočty."))) : (React.createElement("table", { style: { width: "100%", borderCollapse: "collapse" } },
                 React.createElement("thead", null,
-                    React.createElement("tr", { style: { background: "#f8fafc" } }, ["Typ nákladu", "Popis", "Částka", ""].map(h => (React.createElement("th", { key: h, style: { padding: "8px 12px", textAlign: "left", fontSize: "11px", fontWeight: "600", color: "#6b7280", borderBottom: "2px solid #e5e7eb" } }, h))))),
-                React.createElement("tbody", null, naklady.map(n => (React.createElement("tr", { key: n.id, style: { borderBottom: "1px solid #f3f4f6" } },
-                    React.createElement("td", { style: { padding: "10px 12px", fontSize: "12px", color: "#4f46e5", fontWeight: "600" } }, n.label),
-                    React.createElement("td", { style: { padding: "10px 12px", fontSize: "12px", color: "#6b7280" } }, n.popis),
-                    React.createElement("td", { style: { padding: "10px 12px", fontSize: "13px", fontWeight: "700", color: "#d97706" } },
-                        "- ",
-                        formatCZK(n.castka)),
-                    React.createElement("td", { style: { padding: "10px 12px" } },
-                        React.createElement(Btn, { onClick: () => delNaklad(n.id), variant: "danger", small: true }, "\uD83D\uDDD1")))))),
+                    React.createElement("tr", { style: { background: "#f8fafc" } }, ["Typ nákladu", "Patří k", "Popis", "Částka", ""].map(h => (React.createElement("th", { key: h, style: { padding: "8px 12px", textAlign: "left", fontSize: "11px", fontWeight: "600", color: "#6b7280", borderBottom: "2px solid #e5e7eb" } }, h))))),
+                React.createElement("tbody", null, naklady.map(n => {
+                    const z = zarazeni(n);
+                    const duvod = duvodNeuplatneni(n);
+                    const neupl = duvod !== null;
+                    const badgeTxt = { "15": "§15 odpočet", "slevy": "Sleva na dani", "neuznatelne": "—", "info": "—", "7": "§7 podnikání", "9": "§9 pronájem" }[z];
+                    return React.createElement("tr", { key: n.id, style: { borderBottom: "1px solid #f3f4f6", background: neupl ? "#fafafa" : "transparent" } },
+                        React.createElement("td", { style: { padding: "10px 12px", fontSize: "12px", color: neupl ? "#9ca3af" : "#4f46e5", fontWeight: "600" } },
+                            n.label,
+                            neupl && React.createElement("div", { style: { fontSize: "10px", fontWeight: "500", color: "#b45309", marginTop: "2px" } }, duvod)),
+                        React.createElement("td", { style: { padding: "10px 12px", fontSize: "12px" } },
+                            VOLBA_9_TYPY.includes(n.typ)
+                                ? React.createElement("select", { value: z === "9" ? "9" : vychoziParagraf(n.typ), onChange: e => setParagrafNaklad(n.id, e.target.value), style: { padding: "4px 6px", border: "1px solid #d1d5db", borderRadius: "6px", fontSize: "11px", cursor: "pointer" } },
+                                    volbyParagrafu(n.typ).map(o => React.createElement("option", { key: o.value, value: o.value }, o.label)))
+                                : React.createElement("span", { style: { color: "#6b7280" } }, badgeTxt),
+                            z === "9" && n.nemovitostId && React.createElement("div", { style: { fontSize: "10px", color: "#6b7280", marginTop: "2px" } }, "🏠 ", nazevBytu(n.nemovitostId))),
+                        React.createElement("td", { style: { padding: "10px 12px", fontSize: "12px", color: "#6b7280" } }, n.popis),
+                        React.createElement("td", { style: { padding: "10px 12px", fontSize: "13px", fontWeight: "700", color: neupl ? "#9ca3af" : "#d97706", textDecoration: neupl ? "line-through" : "none" } },
+                            "- ",
+                            formatCZK(n.castka)),
+                        React.createElement("td", { style: { padding: "10px 12px" } },
+                            React.createElement(Btn, { onClick: () => delNaklad(n.id), variant: "danger", small: true }, "🗑")));
+                })),
                 React.createElement("tfoot", null,
                     totalNakladyPar7 > 0 && React.createElement("tr", { style: { background: "#fafafa" } },
-                        React.createElement("td", { colSpan: "2", style: { padding: "8px 12px", fontWeight: "600", fontSize: "12px", color: "#6b7280" } }, "\u2022 \u00A77 v\u00FDdaje (sni\u017Euj\u00ED p\u0159\u00EDjmy z podnik\u00E1n\u00ED)"),
-                        React.createElement("td", { style: { padding: "8px 12px", fontWeight: "600", fontSize: "12px", color: "#d97706" } }, "- ", formatCZK(totalNakladyPar7)),
+                        React.createElement("td", { colSpan: "3", style: { padding: "8px 12px", fontWeight: "600", fontSize: "12px", color: "#6b7280" } }, "• §7 výdaje k podnikání", metodaVydaju === "pausal" ? " — neuplatní se (paušál 60 %)" : ""),
+                        React.createElement("td", { style: { padding: "8px 12px", fontWeight: "600", fontSize: "12px", color: metodaVydaju === "pausal" ? "#9ca3af" : "#d97706", textDecoration: metodaVydaju === "pausal" ? "line-through" : "none" } }, "- ", formatCZK(totalNakladyPar7)),
+                        React.createElement("td", null)),
+                    totalNakladyPar9 > 0 && React.createElement("tr", { style: { background: "#fafafa" } },
+                        React.createElement("td", { colSpan: "3", style: { padding: "8px 12px", fontWeight: "600", fontSize: "12px", color: "#6b7280" } }, "• §9 výdaje k pronájmu",
+                            rocni.nemovitostPrijmy <= 0 ? " — neuplatní se (bez příjmů z pronájmu)" : metoda9 !== "skutecne" ? " — neuplatní se (paušál 30 %)" : ""),
+                        React.createElement("td", { style: { padding: "8px 12px", fontWeight: "600", fontSize: "12px", color: (metoda9 === "skutecne" && rocni.nemovitostPrijmy > 0) ? "#0369a1" : "#9ca3af", textDecoration: (metoda9 === "skutecne" && rocni.nemovitostPrijmy > 0) ? "none" : "line-through" } }, "- ", formatCZK(totalNakladyPar9)),
                         React.createElement("td", null)),
                     totalNakladyPar15 > 0 && React.createElement("tr", { style: { background: "#fafafa" } },
-                        React.createElement("td", { colSpan: "2", style: { padding: "8px 12px", fontWeight: "600", fontSize: "12px", color: "#6b7280" } }, "\u2022 \u00A715 odpo\u010Dty (sni\u017Euj\u00ED z\u00E1klad dan\u011B)"),
+                        React.createElement("td", { colSpan: "3", style: { padding: "8px 12px", fontWeight: "600", fontSize: "12px", color: "#6b7280" } }, "• §15 odpočty (snižují základ daně)"),
                         React.createElement("td", { style: { padding: "8px 12px", fontWeight: "600", fontSize: "12px", color: "#0891b2" } }, "- ", formatCZK(totalNakladyPar15)),
                         React.createElement("td", null)),
                     totalSlevyNaDani > 0 && React.createElement("tr", { style: { background: "#fafafa" } },
-                        React.createElement("td", { colSpan: "2", style: { padding: "8px 12px", fontWeight: "600", fontSize: "12px", color: "#6b7280" } }, "\u2022 Slevy na dani \u00A735ba/\u00A735c (sni\u017Euj\u00ED da\u0148)"),
+                        React.createElement("td", { colSpan: "3", style: { padding: "8px 12px", fontWeight: "600", fontSize: "12px", color: "#6b7280" } }, "• Slevy na dani §35ba/§35c (snižují daň)"),
                         React.createElement("td", { style: { padding: "8px 12px", fontWeight: "600", fontSize: "12px", color: "#7c3aed" } }, "- ", formatCZK(totalSlevyNaDani)),
                         React.createElement("td", null)),
                     React.createElement("tr", { style: { background: "#f0f4fa" } },
-                        React.createElement("td", { colSpan: "2", style: { padding: "10px 12px", fontWeight: "700", fontSize: "13px" } }, "Celkem v\u00FDdaje a odpo\u010Dty"),
+                        React.createElement("td", { colSpan: "3", style: { padding: "10px 12px", fontWeight: "700", fontSize: "13px" } }, "Celkem uplatněno"),
                         React.createElement("td", { style: { padding: "10px 12px", fontWeight: "700", fontSize: "14px", color: "#d97706" } },
                             "- ",
-                            formatCZK(totalNaklady)),
+                            formatCZK(totalUplatneno)),
+                        React.createElement("td", null)),
+                    totalNeuplatneno > 0 && React.createElement("tr", null,
+                        React.createElement("td", { colSpan: "3", style: { padding: "6px 12px", fontSize: "11px", color: "#9ca3af" } }, "Neuplatněno (pokryto paušálem nebo nedaňové)"),
+                        React.createElement("td", { style: { padding: "6px 12px", fontSize: "11px", color: "#9ca3af" } }, formatCZK(totalNeuplatneno)),
                         React.createElement("td", null))))))));
 }
 // ============================================================
@@ -8618,17 +8780,17 @@ function Nastaveni({ data, updateData, notify, emailTemplatesExpandedFaktury, se
                         "DPH sn\u00ED\u017Een\u00E1 sazba: ",
                         React.createElement("strong", null, "12%")),
                     React.createElement("div", null,
-                        "Da\u0148 z p\u0159\u00EDjmu do 1 582 812 K\u010D: ",
+                        "Da\u0148 z p\u0159\u00EDjmu do " + getHranice23(new Date().getFullYear()).toLocaleString("cs-CZ") + " K\u010D: ",
                         React.createElement("strong", null, "15%")),
                     React.createElement("div", null,
-                        "Da\u0148 z p\u0159\u00EDjmu nad 1 582 812 K\u010D: ",
+                        "Da\u0148 z p\u0159\u00EDjmu nad " + getHranice23(new Date().getFullYear()).toLocaleString("cs-CZ") + " K\u010D: ",
                         React.createElement("strong", null, "23%")),
                     React.createElement("div", null,
-                        "Sleva na poplatn\u00EDka 2024: ",
+                        "Sleva na poplatn\u00EDka: ",
                         React.createElement("strong", null, "30 840 K\u010D/rok")),
                     React.createElement("div", null,
                         "Term\u00EDn DP (bez poradce): ",
-                        React.createElement("strong", null, "1. dubna")),
+                        React.createElement("strong", null, "1. dubna (elektronicky 1. kv\u011Btna)")),
                     React.createElement("div", null,
                         "Term\u00EDn DPH (\u010Dtvrtletn\u00ED): ",
                         React.createElement("strong", null, "25. den po kvart\u00E1lu")))))));
