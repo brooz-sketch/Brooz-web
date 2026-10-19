@@ -4932,16 +4932,21 @@ function DanZPrijmu({ data, updateData, notify }) {
 
     const [showAddForm, setShowAddForm] = (0, useState)(false);
     const [newNaklad, setNewNaklad] = (0, useState)({ typ: "auto_pausal", popis: "", castka: 0, paragraf: "7", nemovitostId: "" });
+    const [editNakladId, setEditNakladId] = (0, useState)(null); // ⭐ id upravované položky (null = přidávání)
+    const prazdnyNaklad = () => ({ typ: "auto_pausal", popis: "", castka: 0, paragraf: "7", nemovitostId: "" });
+    const zavritFormNaklad = () => { setNewNaklad(prazdnyNaklad()); setEditNakladId(null); setShowAddForm(false); };
     const addNaklad = () => {
         if (!newNaklad.castka || newNaklad.castka <= 0) {
             alert("Zadejte částku");
             return;
         }
         const typ = TYPY.find(t => t.id === newNaklad.typ);
+        const puvodni = editNakladId ? naklady.find(n => n.id === editNakladId) : null;
         const item = {
-            id: generateId(),
+            id: puvodni ? puvodni.id : generateId(),
             typ: newNaklad.typ,
-            label: (typ === null || typ === void 0 ? void 0 : typ.label) || newNaklad.typ,
+            // U editace beze změny typu ponecháme původní název položky
+            label: (puvodni && puvodni.typ === newNaklad.typ && puvodni.label) || (typ === null || typ === void 0 ? void 0 : typ.label) || newNaklad.typ,
             popis: newNaklad.popis || (typ === null || typ === void 0 ? void 0 : typ.label) || "",
             castka: parseFloat(newNaklad.castka) || 0,
         };
@@ -4949,11 +4954,28 @@ function DanZPrijmu({ data, updateData, notify }) {
             item.paragraf = newNaklad.paragraf || vychoziParagraf(newNaklad.typ);
             if (item.paragraf === "9" && newNaklad.nemovitostId) item.nemovitostId = newNaklad.nemovitostId;
         }
-        saveNaklady(naklady.concat([item]));
-        setNewNaklad({ typ: "auto_pausal", popis: "", castka: 0, paragraf: "7", nemovitostId: "" });
-        setShowAddForm(false);
-        notify("Náklad přidán");
+        if (puvodni) {
+            saveNaklady(naklady.map(n => n.id === puvodni.id ? item : n));
+            notify("Náklad upraven");
+        } else {
+            saveNaklady(naklady.concat([item]));
+            notify("Náklad přidán");
+        }
+        zavritFormNaklad();
     };
+    // ⭐ Otevření formuláře s hodnotami existující položky
+    const editNaklad = (n) => {
+        setNewNaklad({
+            typ: n.typ,
+            popis: n.popis || "",
+            castka: n.castka || 0,
+            paragraf: VOLBA_9_TYPY.includes(n.typ) ? (n.paragraf || vychoziParagraf(n.typ)) : undefined,
+            nemovitostId: n.nemovitostId || "",
+        });
+        setEditNakladId(n.id);
+        setShowAddForm(true);
+    };
+    const lzeUpravit = (n) => !INFO_TYPY.includes(n.typ) && !NEDANOVE_TYPY.includes(n.typ);
     const delNaklad = (id) => {
         saveNaklady(naklady.filter(n => n.id !== id));
         notify("Náklad odstraněn");
@@ -5336,8 +5358,9 @@ function DanZPrijmu({ data, updateData, notify }) {
                 React.createElement("h3", { style: { margin: 0, color: "#1a3a5c" } },
                     "\uD83D\uDCCB V\u00FDdaje a odpo\u010Dty ",
                     rok),
-                React.createElement(Btn, { onClick: () => setShowAddForm(v => !v), variant: showAddForm ? "secondary" : "primary", small: true }, showAddForm ? "✕ Zrušit" : "+ Přidat náklad")),
-            showAddForm && (React.createElement("div", { style: { background: "#f8fafc", border: "1px solid #e5e7eb", borderRadius: "10px", padding: "16px", marginBottom: "16px" } },
+                React.createElement(Btn, { onClick: () => { if (showAddForm) zavritFormNaklad(); else { setNewNaklad(prazdnyNaklad()); setEditNakladId(null); setShowAddForm(true); } }, variant: showAddForm ? "secondary" : "primary", small: true }, showAddForm ? "✕ Zrušit" : "+ Přidat náklad")),
+            showAddForm && (React.createElement("div", { style: { background: editNakladId ? "#eff6ff" : "#f8fafc", border: editNakladId ? "1px solid #93c5fd" : "1px solid #e5e7eb", borderRadius: "10px", padding: "16px", marginBottom: "16px" } },
+                editNakladId && React.createElement("div", { style: { fontSize: "13px", fontWeight: "700", color: "#1e40af", marginBottom: "10px" } }, "\u270F\uFE0F \u00DAprava polo\u017Eky"),
                 React.createElement("div", { style: { display: "grid", gridTemplateColumns: "2fr 1fr 1fr auto", gap: "10px", alignItems: "flex-end" } },
                     React.createElement("div", null,
                         React.createElement("div", { style: { fontSize: "11px", fontWeight: "600", color: "#374151", marginBottom: "4px" } }, "Typ nákladu"),
@@ -5349,7 +5372,7 @@ function DanZPrijmu({ data, updateData, notify }) {
                     React.createElement("div", null,
                         React.createElement("div", { style: { fontSize: "11px", fontWeight: "600", color: "#374151", marginBottom: "4px" } }, "Částka (Kč)"),
                         React.createElement("input", { type: "number", value: newNaklad.castka || "", onChange: e => setNewNaklad(p => (Object.assign(Object.assign({}, p), { castka: parseFloat(e.target.value) || 0 }))), placeholder: "0", style: { width: "100%", padding: "8px 10px", border: "1px solid #d1d5db", borderRadius: "6px", fontSize: "12px", boxSizing: "border-box" } })),
-                    React.createElement(Btn, { onClick: addNaklad, variant: "success" }, "✓ Přidat")),
+                    React.createElement(Btn, { onClick: addNaklad, variant: "success" }, editNakladId ? "✓ Uložit změny" : "✓ Přidat")),
                 // ⭐ Zařazení: §7 podnikání / §15 vlastní bydlení ↔ §9 pronájem
                 VOLBA_9_TYPY.includes(newNaklad.typ) && React.createElement("div", { style: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginTop: "10px" } },
                     React.createElement("div", null,
@@ -5389,7 +5412,7 @@ function DanZPrijmu({ data, updateData, notify }) {
                     const duvod = duvodNeuplatneni(n);
                     const neupl = duvod !== null;
                     const badgeTxt = { "15": "§15 odpočet", "slevy": "Sleva na dani", "neuznatelne": "—", "info": "—", "7": "§7 podnikání", "9": "§9 pronájem" }[z];
-                    return React.createElement("tr", { key: n.id, style: { borderBottom: "1px solid #f3f4f6", background: neupl ? "#fafafa" : "transparent" } },
+                    return React.createElement("tr", { key: n.id, style: { borderBottom: "1px solid #f3f4f6", background: editNakladId === n.id ? "#eff6ff" : neupl ? "#fafafa" : "transparent" } },
                         React.createElement("td", { style: { padding: "10px 12px", fontSize: "12px", color: neupl ? "#9ca3af" : "#4f46e5", fontWeight: "600" } },
                             n.label,
                             neupl && React.createElement("div", { style: { fontSize: "10px", fontWeight: "500", color: "#b45309", marginTop: "2px" } }, duvod)),
@@ -5404,7 +5427,9 @@ function DanZPrijmu({ data, updateData, notify }) {
                             "- ",
                             formatCZK(n.castka)),
                         React.createElement("td", { style: { padding: "10px 12px" } },
-                            React.createElement(Btn, { onClick: () => delNaklad(n.id), variant: "danger", small: true }, "🗑")));
+                            React.createElement("div", { style: { display: "flex", gap: "4px" } },
+                                lzeUpravit(n) && React.createElement(Btn, { onClick: () => editNaklad(n), variant: "secondary", small: true }, "✏️"),
+                                React.createElement(Btn, { onClick: () => { if (editNakladId === n.id) zavritFormNaklad(); delNaklad(n.id); }, variant: "danger", small: true }, "🗑"))));
                 })),
                 React.createElement("tfoot", null,
                     totalNakladyPar7 > 0 && React.createElement("tr", { style: { background: "#fafafa" } },
